@@ -4,7 +4,7 @@
 **Tip:** SaaS aplikacija — AI-powered video clipping za content creators  
 **Cilj:** €1000/MRR do kraja mjeseca 2  
 **Timeline:** 30 dana razvoja, launch krajem mjeseca 1  
-**Stack:** Next.js 14, Supabase, Claude API, Groq Whisper, Modal, Vercel, Creem
+**Stack:** Next.js 16+, Supabase, Claude API, Groq Whisper, Modal, Vercel, Creem
 
 ---
 
@@ -148,7 +148,7 @@ Korisnik vidi notifikaciju → Dashboard prikazuje klipove
 ## 2.2 Tech stack
 
 ### Frontend
-- Next.js 14 (App Router)
+- Next.js 16+ (App Router)
 - Tailwind CSS + shadcn/ui
 - TanStack Query (React Query)
 - Zustand (state management)
@@ -965,7 +965,7 @@ SEDMICA 4: Launch (Dan 22-30)
 ## 5.2 Sedmica 1: Foundation
 
 ### Dan 1: Setup projekta
-- Inicijalizacija Next.js 14 + TypeScript
+- Inicijalizacija Next.js 16+ + TypeScript
 - Setup Tailwind, shadcn/ui
 - Setup Git, GitHub, Vercel
 - Setup Supabase

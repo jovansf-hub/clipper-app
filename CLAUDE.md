@@ -4,7 +4,7 @@
 SPEC.md is the canonical specification. Read it before any major task.
 
 ## Tech Stack
-- Next.js 14 (App Router) + TypeScript
+- Next.js 16+ (App Router) + TypeScript
 - Tailwind CSS + shadcn/ui  
 - Supabase (Postgres + Auth + Storage)
 - Inngest (background jobs)
