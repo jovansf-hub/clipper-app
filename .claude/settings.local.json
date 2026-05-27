@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Start-Sleep -Seconds 6; Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 5 2>&1 | Select-Object -ExpandProperty StatusCode)",
+      "PowerShell(Start-Sleep -Seconds 5; \\(Invoke-WebRequest \"http://localhost:3000/login\" -UseBasicParsing\\).StatusCode)",
+      "PowerShell(Stop-Process *)"
+    ]
+  }
+}
