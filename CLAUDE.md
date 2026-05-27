@@ -70,8 +70,8 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Day 2: Auth UI (login, signup, forgot-password with email + Google OAuth)
 
 ### Next Steps
-- [ ] Day 2: Configure Supabase Dashboard (Site URL, Redirect URLs)
-- [ ] Day 2: Test full registration flow
+- [x] Day 2: Configure Supabase Dashboard (Site URL, Redirect URLs)
+- [x] Day 2: Test full registration flow (signup -> email confirm -> profile created -> login)
 - [ ] Day 3: Landing page implementation
 - [ ] Day 3: Dashboard layout + sidebar
 - [ ] Day 4: Upload UI with drag & drop
