@@ -1,12 +1,12 @@
 import { type NextRequest } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
 export default async function proxy(request: NextRequest) {
-  // TODO: Implement Supabase auth check using "Thin Proxy" pattern
-  // - Only check cookie existence here
-  // - Heavy session validation goes in Server Components
-  // - Avoid Supabase "logout loop" bug by syncing cookies properly
+  return await updateSession(request);
 }
 
 export const config = {
-  matcher: [],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
