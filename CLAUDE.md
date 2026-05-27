@@ -47,5 +47,12 @@ All migrations are in /supabase/migrations/. Never modify the database schema wi
 ## Testing
 For MVP, manual testing is sufficient. Add unit tests only for critical logic (credit calculations, viral analysis JSON parsing).
 
+## Next.js 16 Auth Pattern
+- File is proxy.ts (NOT middleware.ts) - Next.js 16 standard
+- Use "Thin Proxy" pattern: only check cookie existence in proxy.ts
+- Heavy session validation (DB lookups, JWT verification) goes in Server Components
+- For Supabase: implement cookie sync properly to avoid logout loop bug
+- Reference: https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+
 ## Project Goal
 Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target: â‚¬1000 MRR by end of month 2. Strict 30-day MVP timeline.
