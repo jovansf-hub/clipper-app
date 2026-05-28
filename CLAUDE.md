@@ -75,9 +75,12 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Day 3: Fixed Base UI button warnings (nativeButton={false} for link-buttons)
 
 ### Next Steps
-- [ ] Day 3: Landing page (hero, features, pricing, FAQ)
+- [x] Day 3: Landing page (hero, features, pricing, comparison, FAQ)
 - [ ] Day 4: Upload UI with drag & drop
 - [ ] Day 5-7: Inngest setup + Groq Whisper transcription
+
+### Known Issues
+- [ ] /videos route returns 404 (sidebar "My Videos" link) - fix when building videos list page
 
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)
