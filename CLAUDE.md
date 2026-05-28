@@ -68,12 +68,14 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Day 2: Database migration applied to Supabase (6 tables + RLS + functions)
 - [x] Day 2: TypeScript Database types in lib/types.ts
 - [x] Day 2: Auth UI (login, signup, forgot-password with email + Google OAuth)
-
-### Next Steps
 - [x] Day 2: Configure Supabase Dashboard (Site URL, Redirect URLs)
 - [x] Day 2: Test full registration flow (signup -> email confirm -> profile created -> login)
-- [ ] Day 3: Landing page implementation
-- [ ] Day 3: Dashboard layout + sidebar
+- [x] Day 3: Dashboard layout + sidebar + user menu (with logout)
+- [x] Day 3: Dashboard home page with stat cards and empty state
+- [x] Day 3: Fixed Base UI button warnings (nativeButton={false} for link-buttons)
+
+### Next Steps
+- [ ] Day 3: Landing page (hero, features, pricing, FAQ)
 - [ ] Day 4: Upload UI with drag & drop
 - [ ] Day 5-7: Inngest setup + Groq Whisper transcription
 
