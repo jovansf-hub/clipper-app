@@ -76,11 +76,15 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 
 ### Next Steps
 - [x] Day 3: Landing page (hero, features, pricing, comparison, FAQ)
-- [ ] Day 4: Upload UI with drag & drop
-- [ ] Day 5-7: Inngest setup + Groq Whisper transcription
+- [x] Day 4: Upload pipeline complete (UI, validation, credit calc, backend, storage)
+- [x] Day 4: Fixed /videos 404 with proper list page
+- [ ] Day 5: Inngest setup for background job processing
+- [ ] Day 5: Groq Whisper transcription pipeline
 
-### Known Issues
-- [ ] /videos route returns 404 (sidebar "My Videos" link) - fix when building videos list page
+### Tested Manually
+- [x] Real upload tested with mp3 file - 1.0MB, 58s, status='uploaded'
+- [x] Storage path: videos/{user_id}/{video_id}/{filename}
+- [x] Credit deducted from 5 to 4
 
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)
