@@ -44,6 +44,7 @@ export type Database = {
           content_type: string;
           language: string;
           clip_count_requested: number;
+          caption_style_requested: string;
           created_at: string;
           processing_started_at: string | null;
           processing_completed_at: string | null;
