@@ -82,9 +82,8 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Day 5: Groq Whisper transcription working
 - [x] Day 5: Real-time status updates via Supabase Realtime
 - [x] Day 5: Security review applied (6 fixes)
-- [ ] Day 6: Claude Haiku viral moment analysis
-- [ ] Day 6: Implement viral_moments DB structure
-- [ ] Day 6: Update process-video pipeline to add analysis step
+- [x] Day 6: Claude Haiku viral moment analysis - integration verified
+- [ ] Day 7: Modal.com FFmpeg integration for actual clip generation
 
 ### Tested Manually
 - [x] Real upload tested with mp3 file - 1.0MB, 58s, status='uploaded'
@@ -93,6 +92,7 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Full transcription pipeline tested - 58s mp3 transcribed successfully
 - [x] Credit deduction works on process start
 - [x] Status updates through pipeline phases
+- [x] Claude Haiku isolated test: 74s fake transcript → 5 viral moments, $0.03 cost, JSON valid
 
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)
