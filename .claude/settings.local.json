@@ -20,7 +20,11 @@
       "Bash(Test-Path \"C:\\\\Projects\\\\clipper-app\\\\components\\\\dashboard\\\\credit-calculator.tsx\")",
       "Bash(Test-Path \"C:\\\\Projects\\\\clipper-app\\\\app\\\\\\(dashboard\\)\\\\upload\\\\page.tsx\")",
       "Bash(Test-Path \"C:\\\\Projects\\\\clipper-app\\\\app\\\\api\\\\upload\\\\route.ts\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Jovan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Projects-clipper-app\\\\48ebf591-fae7-45b8-8c58-2688ccdf89c2\\\\tasks\\\\bvyg9g0ru.output\")",
+      "Bash(Select-Object -Last 20)",
+      "Bash(taskkill *)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }

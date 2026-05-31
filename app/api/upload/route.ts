@@ -129,6 +129,24 @@ export async function POST(request: Request) {
       .single();
 
     const userPlan = (profile?.plan as string) ?? "free";
+
+    const FREE_CAPTION_STYLES = ["tiktok_highlight"];
+    if (userPlan === "free" && !FREE_CAPTION_STYLES.includes(caption_style_requested)) {
+      return NextResponse.json(
+        { error: "Caption style requires upgrade", available_for_free: FREE_CAPTION_STYLES },
+        { status: 403 }
+      );
+    }
+
+    const MAX_CLIPS_BY_PLAN: Record<string, number> = { free: 5, creator: 15, pro: 15 };
+    const maxAllowedClips = MAX_CLIPS_BY_PLAN[userPlan] ?? 5;
+    if (clip_count_requested > maxAllowedClips) {
+      return NextResponse.json(
+        { error: `Clip count exceeds plan limit (max ${maxAllowedClips})` },
+        { status: 403 }
+      );
+    }
+
     const retention = RETENTION_DAYS[userPlan] ?? 7;
     const expiresAt = new Date(Date.now() + retention * 86_400_000).toISOString();
 
