@@ -1,6 +1,7 @@
 import { inngest } from "../client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { transcribeAudio } from "@/lib/groq";
+import { analyzeViralMoments } from "@/lib/anthropic";
 
 export const processVideo = inngest.createFunction(
   {
@@ -65,6 +66,52 @@ export const processVideo = inngest.createFunction(
       return result;
     });
 
+    const viralAnalysis = await step.run("analyze-viral-moments", async () => {
+      const supabase = createAdminClient();
+
+      await supabase
+        .from("videos")
+        .update({ status: "analyzing" })
+        .eq("id", videoId);
+
+      const { data: video, error } = await supabase
+        .from("videos")
+        .select("transcript_text, transcript_segments, content_type, clip_count_requested, language")
+        .eq("id", videoId)
+        .single();
+
+      if (error || !video) throw new Error("Video not found for analysis");
+
+      if (!video.transcript_text || video.transcript_text.trim().length === 0) {
+        return { moments: [], reasoning: "No transcript available", content_summary: "" };
+      }
+
+      const segmentsData = video.transcript_segments as {
+        segments?: Array<{ start: number; end: number; text: string }>;
+        duration?: number;
+      } | null;
+
+      const result = await analyzeViralMoments(
+        {
+          text: video.transcript_text,
+          duration: segmentsData?.duration ?? 0,
+          segments: segmentsData?.segments ?? [],
+        },
+        {
+          contentType: video.content_type || "podcast",
+          clipCount: video.clip_count_requested || 10,
+          language: video.language || "en",
+        }
+      );
+
+      await supabase
+        .from("videos")
+        .update({ viral_analysis: result })
+        .eq("id", videoId);
+
+      return result;
+    });
+
     await step.run("mark-completed-temp", async () => {
       const supabase = createAdminClient();
       await supabase
@@ -82,6 +129,7 @@ export const processVideo = inngest.createFunction(
       userId,
       transcriptLength: transcription.text.length,
       duration: transcription.duration,
+      momentsFound: viralAnalysis.moments.length,
     };
   }
 );

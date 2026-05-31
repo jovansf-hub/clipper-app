@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDuration } from "@/lib/utils";
 import { VideoStatus } from "@/components/dashboard/video-status";
+import type { ViralAnalysisResult } from "@/lib/anthropic";
 
 type Params = Promise<{ id: string }>;
 
@@ -22,7 +23,7 @@ export default async function VideoPage({ params }: { params: Params }) {
   const { data: video } = await supabase
     .from("videos")
     .select(
-      "id, title, status, duration_seconds, file_size_bytes, created_at, content_type, clip_count_requested, error_message, language, mime_type, transcript_text"
+      "id, title, status, duration_seconds, file_size_bytes, created_at, content_type, clip_count_requested, error_message, language, mime_type, transcript_text, viral_analysis"
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -50,6 +51,7 @@ export default async function VideoPage({ params }: { params: Params }) {
           status: video.status,
           error_message: video.error_message ?? null,
           transcript_text: video.transcript_text ?? null,
+          viral_analysis: (video.viral_analysis ?? null) as ViralAnalysisResult | null,
         }}
       />
 

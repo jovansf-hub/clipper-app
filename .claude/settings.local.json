@@ -24,7 +24,8 @@
       "Bash(Get-Content \"C:\\\\Users\\\\Jovan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Projects-clipper-app\\\\48ebf591-fae7-45b8-8c58-2688ccdf89c2\\\\tasks\\\\bvyg9g0ru.output\")",
       "Bash(Select-Object -Last 20)",
       "Bash(taskkill *)",
-      "PowerShell(Get-NetTCPConnection *)"
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(npm install *)"
     ]
   }
 }

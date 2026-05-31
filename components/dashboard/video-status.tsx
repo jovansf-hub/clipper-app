@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Scissors, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { ViralAnalysisResult, ViralMoment } from "@/lib/anthropic";
 
 type VideoStatusValue =
   | "uploading"
@@ -22,6 +23,7 @@ interface VideoData {
   status: string;
   error_message: string | null;
   transcript_text: string | null;
+  viral_analysis: ViralAnalysisResult | null;
 }
 
 interface VideoStatusProps {
@@ -50,6 +52,49 @@ const STATUS_LABEL: Record<VideoStatusValue, string> = {
   completed: "Completed",
   failed: "Failed",
 };
+
+const HOOK_TYPE_STYLES: Record<
+  ViralMoment["hook_type"],
+  { label: string; className: string }
+> = {
+  humor:       { label: "Humor",       className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
+  insight:     { label: "Insight",     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
+  controversy: { label: "Controversy", className: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
+  emotional:   { label: "Emotional",   className: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" },
+  actionable:  { label: "Actionable",  className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  surprising:  { label: "Surprising",  className: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300" },
+};
+
+function formatSeconds(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function ViralScoreBadge({ score }: { score: number }) {
+  const { label, barClass } =
+    score >= 80
+      ? { label: "Great", barClass: "bg-emerald-500" }
+      : score >= 60
+      ? { label: "Good", barClass: "bg-blue-500" }
+      : score >= 40
+      ? { label: "Okay", barClass: "bg-amber-500" }
+      : { label: "Low", barClass: "bg-slate-400" };
+
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-20 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0">
+        <div
+          className={`h-full rounded-full ${barClass}`}
+          style={{ width: `${score}%` }}
+        />
+      </div>
+      <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+        {score} · {label}
+      </span>
+    </div>
+  );
+}
 
 function BounceDots() {
   return (
@@ -152,14 +197,12 @@ export function VideoStatus({ initialVideo }: VideoStatusProps) {
   const status = video.status as VideoStatusValue;
   const statusVariant = STATUS_VARIANT[status] ?? "outline";
   const statusLabel = STATUS_LABEL[status] ?? video.status;
+  const moments = video.viral_analysis?.moments ?? [];
 
   return (
     <div className="space-y-3">
       <div>
-        <Badge
-          variant={statusVariant}
-          className="text-sm px-3 py-1 h-auto"
-        >
+        <Badge variant={statusVariant} className="text-sm px-3 py-1 h-auto">
           {statusLabel}
         </Badge>
       </div>
@@ -211,7 +254,7 @@ export function VideoStatus({ initialVideo }: VideoStatusProps) {
           <CardContent className="p-4 flex items-center gap-3">
             <BounceDots />
             <p className="text-sm text-violet-700 dark:text-violet-300">
-              Finding viral moments... (Day 6)
+              Finding viral moments... (Claude is thinking)
             </p>
           </CardContent>
         </Card>
@@ -238,6 +281,77 @@ export function VideoStatus({ initialVideo }: VideoStatusProps) {
               </p>
             </CardContent>
           </Card>
+
+          {moments.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Found {moments.length} viral moment{moments.length !== 1 ? "s" : ""}
+              </p>
+
+              {moments.map((moment, i) => {
+                const hookStyle = HOOK_TYPE_STYLES[moment.hook_type] ?? {
+                  label: moment.hook_type,
+                  className: "bg-slate-100 text-slate-700",
+                };
+                return (
+                  <Card key={i} className="border-slate-200 dark:border-slate-700">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                          {moment.title}
+                        </p>
+                        <span
+                          className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${hookStyle.className}`}
+                        >
+                          {hookStyle.label}
+                        </span>
+                      </div>
+
+                      <ViralScoreBadge score={moment.viral_score} />
+
+                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span>
+                          {formatSeconds(moment.start_time)} –{" "}
+                          {formatSeconds(moment.end_time)}
+                        </span>
+                        <span>·</span>
+                        <span>{Math.round(moment.duration)}s</span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        {moment.reasoning}
+                      </p>
+
+                      <p className="text-xs text-slate-500 dark:text-slate-500 italic leading-relaxed border-l-2 border-slate-200 dark:border-slate-700 pl-2">
+                        &ldquo;{moment.transcript_excerpt}&rdquo;
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              <Button size="sm" disabled className="w-full" variant="outline">
+                <Scissors className="size-3.5 mr-1.5" />
+                Generate Clips (coming soon)
+              </Button>
+            </div>
+          ) : video.viral_analysis ? (
+            <Card className="border-slate-200 dark:border-slate-700">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  No viral moments found.
+                </p>
+                {video.viral_analysis.reasoning && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {video.viral_analysis.reasoning}
+                  </p>
+                )}
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Try a longer or more dynamic recording.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {video.transcript_text && (
             <Card>
