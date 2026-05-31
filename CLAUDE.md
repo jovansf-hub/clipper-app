@@ -78,13 +78,21 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Day 3: Landing page (hero, features, pricing, comparison, FAQ)
 - [x] Day 4: Upload pipeline complete (UI, validation, credit calc, backend, storage)
 - [x] Day 4: Fixed /videos 404 with proper list page
-- [ ] Day 5: Inngest setup for background job processing
-- [ ] Day 5: Groq Whisper transcription pipeline
+- [x] Day 5: Inngest setup complete
+- [x] Day 5: Groq Whisper transcription working
+- [x] Day 5: Real-time status updates via Supabase Realtime
+- [x] Day 5: Security review applied (6 fixes)
+- [ ] Day 6: Claude Haiku viral moment analysis
+- [ ] Day 6: Implement viral_moments DB structure
+- [ ] Day 6: Update process-video pipeline to add analysis step
 
 ### Tested Manually
 - [x] Real upload tested with mp3 file - 1.0MB, 58s, status='uploaded'
 - [x] Storage path: videos/{user_id}/{video_id}/{filename}
 - [x] Credit deducted from 5 to 4
+- [x] Full transcription pipeline tested - 58s mp3 transcribed successfully
+- [x] Credit deduction works on process start
+- [x] Status updates through pipeline phases
 
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)
