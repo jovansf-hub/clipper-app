@@ -94,6 +94,28 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Status updates through pipeline phases
 - [x] Claude Haiku isolated test: 74s fake transcript → 5 viral moments, $0.03 cost, JSON valid
 
+## RESUME POINT (Day 7a setup)
+- Days 1-6 complete and committed (auth, dashboard, landing, upload, Whisper transcription, Claude Haiku viral analysis)
+- Day 7 decision: Cloudflare Containers + R2 for FFmpeg clipping (fazni pristup, 7a first)
+- Day 7a NOT STARTED yet - waiting on prerequisites
+
+### Cloudflare setup status:
+- [x] Cloudflare account + Workers Paid ($5/mo) active
+- [x] R2 bucket created: "clipper-apps" (Eastern Europe EEUR)
+- [x] R2 API token created (Object Read & Write, scoped to clipper-apps)
+- [x] Wrangler CLI installed + logged in
+- [ ] Docker Desktop - INSTALLING (requires PC restart)
+
+### R2 credentials (in .env later, NOT committed):
+- Account ID: 484db7007332a20354d7638f623dd2de
+- Endpoint: https://484db7007332a20354d7638f623dd2de.r2.cloudflarestorage.com
+- Bucket: clipper-apps
+- Access Key + Secret: stored separately (will add to env)
+
+### NEXT STEP after restart:
+- Verify docker --version works
+- Then: Day 7a prompt (Dockerfile + FFmpeg + Cloudflare Worker container + R2 integration + clip generation Inngest step)
+
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)
 - middleware.ts renamed to proxy.ts (Next.js 16 standard)
