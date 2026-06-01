@@ -94,27 +94,45 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Status updates through pipeline phases
 - [x] Claude Haiku isolated test: 74s fake transcript → 5 viral moments, $0.03 cost, JSON valid
 
-## RESUME POINT (Day 7a setup)
+## RESUME POINT (Day 7a-1 DONE)
 - Days 1-6 complete and committed (auth, dashboard, landing, upload, Whisper transcription, Claude Haiku viral analysis)
-- Day 7 decision: Cloudflare Containers + R2 for FFmpeg clipping (fazni pristup, 7a first)
-- Day 7a NOT STARTED yet - waiting on prerequisites
+- Day 7 decision: Cloudflare Containers + R2 for FFmpeg clipping
+- clip-worker/ Cloudflare Container sa FFmpeg radi end-to-end (lokalno testiran preko Docker)
+- Test: 2 klipa (Big Buck Bunny) -> 9:16 vertical -> R2 upload uspjesan
+- R2 putanja: clips/{userId}/{videoId}/{clipId}.mp4 + _thumb.jpg
+- WORKER_SECRET generisan (u clip-worker/.dev.vars, NOT committed)
 
 ### Cloudflare setup status:
 - [x] Cloudflare account + Workers Paid ($5/mo) active
 - [x] R2 bucket created: "clipper-apps" (Eastern Europe EEUR)
 - [x] R2 API token created (Object Read & Write, scoped to clipper-apps)
 - [x] Wrangler CLI installed + logged in
-- [ ] Docker Desktop - INSTALLING (requires PC restart)
+- [x] Docker Desktop installed + working
+- [x] clip-worker/ implementiran i lokalno testiran
 
-### R2 credentials (in .env later, NOT committed):
-- Account ID: 484db7007332a20354d7638f623dd2de
-- Endpoint: https://484db7007332a20354d7638f623dd2de.r2.cloudflarestorage.com
-- Bucket: clipper-apps
-- Access Key + Secret: stored separately (will add to env)
+### Day 7a-2 TODO (sljedece):
+- [ ] Deploy clip-worker na Cloudflare (wrangler deploy + set secrets)
+- [ ] Inngest step "generate-clips" u process-video pipeline
+- [ ] Insert klipova u clips tabelu nakon generisanja
+- [ ] Presigned R2 URL-ovi za download/preview klipova
+- [ ] UI prikaz gotovih klipova na video detail stranici
 
-### NEXT STEP after restart:
-- Verify docker --version works
-- Then: Day 7a prompt (Dockerfile + FFmpeg + Cloudflare Worker container + R2 integration + clip generation Inngest step)
+### Poznati bug-ovi za fix u 7a-2:
+- [ ] Partial results: ako jedan klip padne, response vraca prazan clips[] iako su prethodni uploadovani. Treba vracati parcijalne rezultate (try/catch po klipu, sakupi uspjesne).
+- [ ] Portrait video edge case: crop formula crop=ih*9/16 daje negativan x ako je source vec vertikalan. Detektovati aspect ratio prije cropa.
+
+### Security TODO (P1/P2/P3) za 7a-2:
+- [ ] P1 A2: Container auth (defense-in-depth) - Bun server provjeri X-Worker-Secret header koji Worker injektuje. CF arhitektura ga ne izlaze javno, ali treba za slucaj misconfiguration.
+- [ ] P1 D1 streaming: Content-Length provjera radi, ali Bun.write jos uvijek streama cijeli fajl bez hard limita na bytes written. Dodati streaming download sa byte counter.
+- [ ] P1 PT3 R2 isolation: r2BaseKey dolazi od klijenta (Inngest). Kad se integrira, generisati ga server-side iz userId/videoId (ne primati od klijenta).
+- [ ] P2 S1: FFmpeg stderr leak - filtrirati/truncirati stderr u error poruci koja ide klijentu (sadrzi interne putanje). Loguj interno, klijentu vrati samo "Processing failed".
+- [ ] P2 S2: R2 error response body leak - ne vracati R2 XML response tijelo klijentu.
+- [ ] P2 A1: Timing-safe WORKER_SECRET comparison u worker.ts (crypto.timingSafeEqual).
+- [ ] P2 V3: preset allowlist - validirati da je jedna od: ultrafast/superfast/veryfast/faster/fast/medium/slow/slower/veryslow.
+- [ ] P2 V4: crf range - validirati kao integer 0-51.
+- [ ] P3 DF1: Dockerfile - zamijeniti curl-pipe-bash Bun install sa FROM oven/bun:1.3.14-debian (pinned version, bez shell installer).
+- [ ] P3 DF2: Pinirati base image sa digest (@sha256:...) za reproducibilne buildove.
+- [ ] P3 DF3: Dodati non-root USER u Dockerfile (RUN useradd -r -u 1001 appuser && USER appuser).
 
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)

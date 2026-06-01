@@ -1,0 +1,57 @@
+{
+  // Cloudflare Containers config — wrangler deploy from clip-worker/ directory
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clip-worker",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-04-01",
+  "account_id": "484db7007332a20354d7638f623dd2de",
+
+  // Container config — points to Dockerfile in same directory.
+  // max_instances: how many parallel containers can run simultaneously.
+  // Container env vars (R2_*) must be set separately — see setup below.
+  "containers": [
+    {
+      "class_name": "ClipContainer",
+      "image": "./Dockerfile",
+      "max_instances": 10
+    }
+  ],
+
+  // Durable Objects binding — Container uses DO infrastructure
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CLIP_CONTAINER",
+        "class_name": "ClipContainer"
+      }
+    ]
+  },
+
+  // Required when introducing new Durable Object / Container classes
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["ClipContainer"]
+    }
+  ]
+
+  // ---------------------------------------------------------------------------
+  // SECRETS — set these via CLI before deploying, NEVER put values here:
+  //
+  // Worker secret (auth between Next.js → Worker):
+  //   wrangler secret put WORKER_SECRET
+  //
+  // R2 credentials for the Container (process.env inside server.ts):
+  //   These are set as Container environment variables in Cloudflare dashboard
+  //   under Workers & Pages → clip-worker → Settings → Variables & Secrets,
+  //   OR via container-level env injection (check CF docs for GA syntax).
+  //
+  // Required vars in Container:
+  //   R2_ACCESS_KEY_ID
+  //   R2_SECRET_ACCESS_KEY
+  //   R2_ENDPOINT=https://484db7007332a20354d7638f623dd2de.r2.cloudflarestorage.com
+  //   R2_BUCKET=clipper-apps
+  //
+  // For local dev: copy .dev.vars.example → .dev.vars and fill in values.
+  // ---------------------------------------------------------------------------
+}

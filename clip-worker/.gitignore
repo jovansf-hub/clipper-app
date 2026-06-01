@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+dist/
+*.log
+
+# Local dev env vars — copy to .dev.vars and fill in real values
+.dev.vars

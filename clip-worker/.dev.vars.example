@@ -1,0 +1,13 @@
+# Copy this file to .dev.vars and fill in real values.
+# .dev.vars is used by `wrangler dev` for local development.
+# NEVER commit .dev.vars to git.
+
+# Worker auth secret (shared between Next.js API and this Worker)
+WORKER_SECRET=your-secret-here
+
+# R2 credentials — Container reads these via process.env
+R2_ACCOUNT_ID=484db7007332a20354d7638f623dd2de
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_ENDPOINT=https://484db7007332a20354d7638f623dd2de.r2.cloudflarestorage.com
+R2_BUCKET=clipper-apps
