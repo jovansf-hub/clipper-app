@@ -5,6 +5,7 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-04-01",
   "account_id": "484db7007332a20354d7638f623dd2de",
+  "workers_dev": true,
 
   // Container config — points to Dockerfile in same directory.
   // max_instances: how many parallel containers can run simultaneously.
@@ -13,6 +14,7 @@
     {
       "class_name": "ClipContainer",
       "image": "./Dockerfile",
+      "instance_type": "standard-1",
       "max_instances": 10
     }
   ],
@@ -31,7 +33,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["ClipContainer"]
+      "new_sqlite_classes": ["ClipContainer"]
     }
   ]
 

@@ -122,6 +122,7 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [ ] Portrait video edge case: crop formula crop=ih*9/16 daje negativan x ako je source vec vertikalan. Detektovati aspect ratio prije cropa.
 
 ### Security TODO (P1/P2/P3) za 7a-2:
+- [ ] P1 PROD-CRITICAL: clip-worker je na javnom workers.dev (clip-worker.jovansf.workers.dev). Prije produkcije: Worker NE smije biti javno dostupan. Opcije: (a) service binding izmedju Next.js Worker-a i clip-worker (najcistije, nema javne URL), ILI (b) custom domen + Cloudflare Access policy, ILI (c) mTLS. Trenutno stiti samo Bearer auth + SSRF, sto je OK za MVP/testiranje ali NE za produkciju. Obavezno zatvoriti prije launcha.
 - [ ] P1 A2: Container auth (defense-in-depth) - Bun server provjeri X-Worker-Secret header koji Worker injektuje. CF arhitektura ga ne izlaze javno, ali treba za slucaj misconfiguration.
 - [ ] P1 D1 streaming: Content-Length provjera radi, ali Bun.write jos uvijek streama cijeli fajl bez hard limita na bytes written. Dodati streaming download sa byte counter.
 - [ ] P1 PT3 R2 isolation: r2BaseKey dolazi od klijenta (Inngest). Kad se integrira, generisati ga server-side iz userId/videoId (ne primati od klijenta).

@@ -22,22 +22,27 @@ interface ClipRequest {
     crf?: number;
     preset?: string;
   };
-  r2BaseKey: string;
 }
 
 interface ClipResult {
   clipId: string;
   r2Key: string;
-  r2Url: string;         // NOTE: not publicly accessible until 7a-2 (presigned URLs)
+  r2Url: string;         // NOTE: not publicly accessible until presigned URLs added
   thumbnailKey: string;
   thumbnailUrl: string;
   durationSeconds: number;
   fileSizeBytes: number;
 }
 
+interface FailedClip {
+  clipId: string;
+  error: string;
+}
+
 interface ClipResponse {
   success: boolean;
   clips: ClipResult[];
+  failed: FailedClip[];
   processingMs: number;
   error?: string;
 }
@@ -59,20 +64,6 @@ function sanitizeId(id: string, field: string): string {
     throw new Error(`Invalid ${field}: must match [a-zA-Z0-9_-]{1,128}`);
   }
   return id;
-}
-
-// P0 PT3: r2BaseKey is "seg/seg/seg" — each segment must pass ID_REGEX.
-// Prevents "../" traversal and arbitrary R2 key injection.
-function validateR2BaseKey(key: string): void {
-  if (typeof key !== "string" || key.length === 0 || key.length > 512) {
-    throw new Error("Invalid r2BaseKey: empty or too long");
-  }
-  const segments = key.split("/");
-  for (const segment of segments) {
-    if (!ID_REGEX.test(segment)) {
-      throw new Error(`Invalid r2BaseKey segment: "${segment}"`);
-    }
-  }
 }
 
 // P0 SS1: Only HTTPS from known Supabase/R2 domains. Blocks metadata endpoints,
@@ -211,8 +202,7 @@ async function uploadToR2(
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`R2 upload failed [${key}] (${response.status}): ${body}`);
+    throw new Error(`R2 upload failed [${key}] (${response.status})`);
   }
 }
 
@@ -220,10 +210,14 @@ async function uploadToR2(
 // Core processing logic
 // ---------------------------------------------------------------------------
 
-async function processClips(req: ClipRequest): Promise<ClipResult[]> {
+async function processClips(req: ClipRequest): Promise<{ results: ClipResult[]; failed: FailedClip[] }> {
   // IDs are pre-sanitized by the handler — safe to use directly in paths.
   const tmpDir = `/tmp/${req.videoId}`;
   const inputPath = `${tmpDir}/source`;
+
+  // P1 PT3: r2BaseKey generated server-side from sanitized userId/videoId.
+  // Never accepted from the caller — prevents arbitrary R2 key injection.
+  const r2BaseKey = `clips/${req.userId}/${req.videoId}`;
 
   if (!existsSync(tmpDir)) {
     await mkdir(tmpDir, { recursive: true });
@@ -239,61 +233,68 @@ async function processClips(req: ClipRequest): Promise<ClipResult[]> {
     const crf = req.config?.crf ?? 23;
     const preset = req.config?.preset ?? "fast";
     const results: ClipResult[] = [];
+    const failed: FailedClip[] = [];
 
     for (const clip of req.clips) {
-      console.log(`[${req.videoId}] Clip ${clip.clipId}: ${clip.startSeconds}s → ${clip.endSeconds}s`);
+      try {
+        console.log(`[${req.videoId}] Clip ${clip.clipId}: ${clip.startSeconds}s → ${clip.endSeconds}s`);
 
-      const clipPath = `${tmpDir}/${clip.clipId}.mp4`;
-      const thumbPath = `${tmpDir}/${clip.clipId}_thumb.jpg`;
+        const clipPath = `${tmpDir}/${clip.clipId}.mp4`;
+        const thumbPath = `${tmpDir}/${clip.clipId}_thumb.jpg`;
 
-      // Cut segment + 9:16 center crop + scale to 1080x1920
-      // crop=ih*9/16:ih:(iw-ih*9/16)/2:0  →  center horizontal crop to 9:16
-      await runFFmpeg([
-        "-i", inputPath,
-        "-ss", String(clip.startSeconds),
-        "-to", String(clip.endSeconds),
-        "-vf", `crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920:flags=lanczos`,
-        "-c:v", "libx264",
-        "-preset", preset,
-        "-crf", String(crf),
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        clipPath,
-      ]);
+        // Cut segment + 9:16 center crop + scale to 1080x1920
+        // crop=ih*9/16:ih:(iw-ih*9/16)/2:0  →  center horizontal crop to 9:16
+        await runFFmpeg([
+          "-i", inputPath,
+          "-ss", String(clip.startSeconds),
+          "-to", String(clip.endSeconds),
+          "-vf", `crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920:flags=lanczos`,
+          "-c:v", "libx264",
+          "-preset", preset,
+          "-crf", String(crf),
+          "-c:a", "aac",
+          "-b:a", "128k",
+          "-movflags", "+faststart",
+          clipPath,
+        ]);
 
-      // Thumbnail: grab frame at 1 second into the clip
-      await runFFmpeg([
-        "-i", clipPath,
-        "-ss", "00:00:01",
-        "-vframes", "1",
-        "-q:v", "2",
-        thumbPath,
-      ]);
+        // Thumbnail: grab frame at 1 second into the clip
+        await runFFmpeg([
+          "-i", clipPath,
+          "-ss", "00:00:01",
+          "-vframes", "1",
+          "-q:v", "2",
+          thumbPath,
+        ]);
 
-      const durationSeconds = await getClipDuration(clipPath);
-      const fileSizeBytes = Bun.file(clipPath).size;
+        const durationSeconds = await getClipDuration(clipPath);
+        const fileSizeBytes = Bun.file(clipPath).size;
 
-      const clipKey = `${req.r2BaseKey}/${clip.clipId}.mp4`;
-      const thumbKey = `${req.r2BaseKey}/${clip.clipId}_thumb.jpg`;
+        const clipKey = `${r2BaseKey}/${clip.clipId}.mp4`;
+        const thumbKey = `${r2BaseKey}/${clip.clipId}_thumb.jpg`;
 
-      await uploadToR2(r2Client, endpoint, bucket, clipKey, clipPath, "video/mp4");
-      await uploadToR2(r2Client, endpoint, bucket, thumbKey, thumbPath, "image/jpeg");
+        await uploadToR2(r2Client, endpoint, bucket, clipKey, clipPath, "video/mp4");
+        await uploadToR2(r2Client, endpoint, bucket, thumbKey, thumbPath, "image/jpeg");
 
-      results.push({
-        clipId: clip.clipId,
-        r2Key: clipKey,
-        r2Url: `${endpoint}/${bucket}/${clipKey}`,
-        thumbnailKey: thumbKey,
-        thumbnailUrl: `${endpoint}/${bucket}/${thumbKey}`,
-        durationSeconds,
-        fileSizeBytes,
-      });
+        results.push({
+          clipId: clip.clipId,
+          r2Key: clipKey,
+          r2Url: `${endpoint}/${bucket}/${clipKey}`,
+          thumbnailKey: thumbKey,
+          thumbnailUrl: `${endpoint}/${bucket}/${thumbKey}`,
+          durationSeconds,
+          fileSizeBytes,
+        });
 
-      console.log(`[${req.videoId}] Clip ${clip.clipId} uploaded to R2 (${(fileSizeBytes / 1024 / 1024).toFixed(1)}MB)`);
+        console.log(`[${req.videoId}] Clip ${clip.clipId} uploaded to R2 (${(fileSizeBytes / 1024 / 1024).toFixed(1)}MB)`);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "Unknown error";
+        console.error(`[${req.videoId}] Clip ${clip.clipId} failed: ${detail}`);
+        failed.push({ clipId: clip.clipId, error: "Processing failed" });
+      }
     }
 
-    return results;
+    return { results, failed };
   } finally {
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -313,7 +314,6 @@ function validateRequest(body: unknown): body is ClipRequest {
     typeof b.videoUrl !== "string" ||
     typeof b.videoId !== "string" ||
     typeof b.userId !== "string" ||
-    typeof b.r2BaseKey !== "string" ||
     !Array.isArray(b.clips) ||
     b.clips.length < 1 ||
     b.clips.length > MAX_CLIPS
@@ -363,7 +363,6 @@ const server = Bun.serve({
         sanitizeId(body.videoId, "videoId");
         sanitizeId(body.userId, "userId");
         validateVideoUrl(body.videoUrl);
-        validateR2BaseKey(body.r2BaseKey);
         for (let i = 0; i < body.clips.length; i++) {
           sanitizeId(body.clips[i].clipId, "clipId");
           validateClip(body.clips[i], i);
@@ -375,10 +374,11 @@ const server = Bun.serve({
       }
 
       try {
-        const clips = await processClips(body);
+        const { results, failed } = await processClips(body);
         const response: ClipResponse = {
-          success: true,
-          clips,
+          success: results.length > 0,
+          clips: results,
+          failed,
           processingMs: Date.now() - startMs,
         };
         return Response.json(response);
@@ -388,6 +388,7 @@ const server = Bun.serve({
         const response: ClipResponse = {
           success: false,
           clips: [],
+          failed: [],
           processingMs: Date.now() - startMs,
           error,
         };
