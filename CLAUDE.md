@@ -94,11 +94,10 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Status updates through pipeline phases
 - [x] Claude Haiku isolated test: 74s fake transcript → 5 viral moments, $0.03 cost, JSON valid
 
-## RESUME POINT (Day 7a-1 DONE)
+## RESUME POINT (Day 7a-2 partial DONE)
 - Days 1-6 complete and committed (auth, dashboard, landing, upload, Whisper transcription, Claude Haiku viral analysis)
 - Day 7 decision: Cloudflare Containers + R2 for FFmpeg clipping
 - clip-worker/ Cloudflare Container sa FFmpeg radi end-to-end (lokalno testiran preko Docker)
-- Test: 2 klipa (Big Buck Bunny) -> 9:16 vertical -> R2 upload uspjesan
 - R2 putanja: clips/{userId}/{videoId}/{clipId}.mp4 + _thumb.jpg
 - WORKER_SECRET generisan (u clip-worker/.dev.vars, NOT committed)
 
@@ -109,16 +108,19 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Wrangler CLI installed + logged in
 - [x] Docker Desktop installed + working
 - [x] clip-worker/ implementiran i lokalno testiran
+- [x] clip-worker DEPLOYOVAN na Cloudflare (https://clip-worker.jovansf.workers.dev)
+- [x] 6 secrets postavljeni (WORKER_SECRET + 5 R2 vars), workers_dev=true, standard-1
+- [x] Production verified: health OK, auth 401, SSRF 400, partial results radi
+- [x] FIX: Partial results (per-clip try/catch, clips[]+failed[], success>=1)
+- [x] FIX: P1 PT3 r2BaseKey server-side iz userId/videoId (ne prima se od klijenta)
 
 ### Day 7a-2 TODO (sljedece):
-- [ ] Deploy clip-worker na Cloudflare (wrangler deploy + set secrets)
 - [ ] Inngest step "generate-clips" u process-video pipeline
 - [ ] Insert klipova u clips tabelu nakon generisanja
 - [ ] Presigned R2 URL-ovi za download/preview klipova
 - [ ] UI prikaz gotovih klipova na video detail stranici
 
-### Poznati bug-ovi za fix u 7a-2:
-- [ ] Partial results: ako jedan klip padne, response vraca prazan clips[] iako su prethodni uploadovani. Treba vracati parcijalne rezultate (try/catch po klipu, sakupi uspjesne).
+### Poznati bug-ovi za fix:
 - [ ] Portrait video edge case: crop formula crop=ih*9/16 daje negativan x ako je source vec vertikalan. Detektovati aspect ratio prije cropa.
 
 ### Security TODO (P1/P2/P3) za 7a-2:
