@@ -74,6 +74,7 @@ export type Database = {
           suggested_hashtags: string[] | null;
           captions: unknown;
           caption_style: string;
+          hook_type: string | null;
           viral_score: number | null;
           viral_reasoning: string | null;
           output_path: string | null;

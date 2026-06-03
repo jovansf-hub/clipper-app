@@ -25,6 +25,10 @@ const envSchema = z.object({
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 
+  // Cloudflare clip-worker
+  CLIP_WORKER_URL: z.string().url().optional(),
+  CLIP_WORKER_SECRET: z.string().min(1).optional(),
+
   // App
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
