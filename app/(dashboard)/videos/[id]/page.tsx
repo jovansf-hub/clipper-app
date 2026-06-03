@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDuration } from "@/lib/utils";
 import { VideoStatus } from "@/components/dashboard/video-status";
+import { ClipsGrid, type ClipGridItem } from "@/components/dashboard/clips-grid";
+import { getPresignedR2Url } from "@/lib/r2";
 import type { ViralAnalysisResult } from "@/lib/anthropic";
 
 type Params = Promise<{ id: string }>;
@@ -30,6 +32,32 @@ export default async function VideoPage({ params }: { params: Params }) {
     .single();
 
   if (!video) notFound();
+
+  // Fetch clips + generate thumbnail presigned URLs server-side (so thumbnails render on load)
+  let clips: ClipGridItem[] = [];
+  if (video.status === "completed") {
+    const { data: rawClips } = await supabase
+      .from("clips")
+      .select("id, title, hook_type, viral_score, duration_seconds, thumbnail_path")
+      .eq("video_id", id)
+      .eq("user_id", user.id)
+      .order("viral_score", { ascending: false });
+
+    if (rawClips && rawClips.length > 0) {
+      clips = await Promise.all(
+        rawClips.map(async (c) => ({
+          id: c.id,
+          title: c.title,
+          hook_type: c.hook_type,
+          viral_score: c.viral_score,
+          duration_seconds: c.duration_seconds,
+          thumbnailUrl: c.thumbnail_path
+            ? await getPresignedR2Url(c.thumbnail_path, 3600).catch(() => null)
+            : null,
+        }))
+      );
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -117,12 +145,12 @@ export default async function VideoPage({ params }: { params: Params }) {
       {video.status === "completed" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Clips</CardTitle>
+            <CardTitle className="text-base">
+              Clips {clips.length > 0 && `(${clips.length})`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Clip viewer will be available in Day 7. Check back soon!
-            </p>
+            <ClipsGrid clips={clips} />
           </CardContent>
         </Card>
       )}

@@ -29,6 +29,12 @@ const envSchema = z.object({
   CLIP_WORKER_URL: z.string().url().optional(),
   CLIP_WORKER_SECRET: z.string().min(1).optional(),
 
+  // Cloudflare R2 (server-only)
+  R2_ENDPOINT: z.string().url().optional(),
+  R2_BUCKET: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+
   // App
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
