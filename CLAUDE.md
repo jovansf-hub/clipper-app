@@ -83,7 +83,7 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Day 5: Real-time status updates via Supabase Realtime
 - [x] Day 5: Security review applied (6 fixes)
 - [x] Day 6: Claude Haiku viral moment analysis - integration verified
-- [ ] Day 7: Modal.com FFmpeg integration for actual clip generation
+- [x] Day 7: Cloudflare Container + FFmpeg clip pipeline (clip-worker deployed, R2, full UI)
 
 ### Tested Manually
 - [x] Real upload tested with mp3 file - 1.0MB, 58s, status='uploaded'
@@ -94,31 +94,18 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Status updates through pipeline phases
 - [x] Claude Haiku isolated test: 74s fake transcript → 5 viral moments, $0.03 cost, JSON valid
 
-## RESUME POINT (Day 7a-2 partial DONE)
-- Days 1-6 complete and committed (auth, dashboard, landing, upload, Whisper transcription, Claude Haiku viral analysis)
-- Day 7 decision: Cloudflare Containers + R2 for FFmpeg clipping
-- clip-worker/ Cloudflare Container sa FFmpeg radi end-to-end (lokalno testiran preko Docker)
-- R2 putanja: clips/{userId}/{videoId}/{clipId}.mp4 + _thumb.jpg
-- WORKER_SECRET generisan (u clip-worker/.dev.vars, NOT committed)
+## RESUME POINT (Day 7a COMPLETE)
+- Days 1-7 complete. Full pipeline: upload → transcribe → analyze → clip → R2 → UI viewer
+- Cloudflare Container (clip-worker) + R2 za FFmpeg clipping, deployed production
+- Next steps per SPEC: captions rendering (Day 14), smart crop/face tracking (Day 13)
 
-### Cloudflare setup status:
-- [x] Cloudflare account + Workers Paid ($5/mo) active
-- [x] R2 bucket created: "clipper-apps" (Eastern Europe EEUR)
-- [x] R2 API token created (Object Read & Write, scoped to clipper-apps)
-- [x] Wrangler CLI installed + logged in
-- [x] Docker Desktop installed + working
-- [x] clip-worker/ implementiran i lokalno testiran
-- [x] clip-worker DEPLOYOVAN na Cloudflare (https://clip-worker.jovansf.workers.dev)
-- [x] 6 secrets postavljeni (WORKER_SECRET + 5 R2 vars), workers_dev=true, standard-1
-- [x] Production verified: health OK, auth 401, SSRF 400, partial results radi
-- [x] FIX: Partial results (per-clip try/catch, clips[]+failed[], success>=1)
-- [x] FIX: P1 PT3 r2BaseKey server-side iz userId/videoId (ne prima se od klijenta)
-
-### Day 7a-2 TODO (sljedece):
-- [ ] Inngest step "generate-clips" u process-video pipeline
-- [ ] Insert klipova u clips tabelu nakon generisanja
-- [ ] Presigned R2 URL-ovi za download/preview klipova
-- [ ] UI prikaz gotovih klipova na video detail stranici
+### Day 7a complete:
+- [x] clip-worker deployed (https://clip-worker.jovansf.workers.dev), 6 secrets
+- [x] generate-clips Inngest step: idempotent, partial-results, rebased captions
+- [x] clips tabela: 3 klipa verified (hook_type, viral_score, output_path, captions)
+- [x] Presigned R2 URLs: thumbnails server-side na load, mp4 lazy na klik
+- [x] UI: ClipsGrid + ClipCard (thumbnail, badge, score, preview, download)
+- [x] Verified end-to-end: real 73s video → 3 vertical 1080x1920 clips in R2
 
 ### Poznati bug-ovi za fix:
 - [ ] Portrait video edge case: crop formula crop=ih*9/16 daje negativan x ako je source vec vertikalan. Detektovati aspect ratio prije cropa.
