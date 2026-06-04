@@ -94,10 +94,10 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Status updates through pipeline phases
 - [x] Claude Haiku isolated test: 74s fake transcript → 5 viral moments, $0.03 cost, JSON valid
 
-## RESUME POINT (Day 7a COMPLETE)
+## RESUME POINT
 - Days 1-7 complete. Full pipeline: upload → transcribe → analyze → clip → R2 → UI viewer
-- Cloudflare Container (clip-worker) + R2 za FFmpeg clipping, deployed production
-- Next steps per SPEC: captions rendering (Day 14), smart crop/face tracking (Day 13)
+- Security hardening (Dani 1-6 review): H1 zatvoreno+dokazano, H2 primijenjeno, H3 implementirano+testirano, H4 kod spreman (browser test pending)
+- Next steps: H4 browser test → DROP UPDATE policy → pre-production checklist ispod
 
 ### Day 7a complete:
 - [x] clip-worker deployed (https://clip-worker.jovansf.workers.dev), 6 secrets
@@ -107,22 +107,53 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] UI: ClipsGrid + ClipCard (thumbnail, badge, score, preview, download)
 - [x] Verified end-to-end: real 73s video → 3 vertical 1080x1920 clips in R2
 
-### Poznati bug-ovi za fix:
-- [ ] Portrait video edge case: crop formula crop=ih*9/16 daje negativan x ako je source vec vertikalan. Detektovati aspect ratio prije cropa.
+### Security hardening complete (Dani 1-6):
+- [x] H1: SECURITY DEFINER RPCs zaštićene in-function service_role guard (5/5 napadački PASS)
+- [x] H2: videos UPDATE WITH CHECK primijenjeno (SQL migracija)
+- [x] H3: verify-duration Inngest step — Groq real duration, kredit korekcija, 6/6 unit testova
+- [x] H4 kod: /api/upload/complete + /api/videos/[id]/retry + process/route.ts → admin client
 
-### Security TODO (P1/P2/P3) za 7a-2:
-- [ ] P1 PROD-CRITICAL: clip-worker je na javnom workers.dev (clip-worker.jovansf.workers.dev). Prije produkcije: Worker NE smije biti javno dostupan. Opcije: (a) service binding izmedju Next.js Worker-a i clip-worker (najcistije, nema javne URL), ILI (b) custom domen + Cloudflare Access policy, ILI (c) mTLS. Trenutno stiti samo Bearer auth + SSRF, sto je OK za MVP/testiranje ali NE za produkciju. Obavezno zatvoriti prije launcha.
-- [ ] P1 A2: Container auth (defense-in-depth) - Bun server provjeri X-Worker-Secret header koji Worker injektuje. CF arhitektura ga ne izlaze javno, ali treba za slucaj misconfiguration.
-- [ ] P1 D1 streaming: Content-Length provjera radi, ali Bun.write jos uvijek streama cijeli fajl bez hard limita na bytes written. Dodati streaming download sa byte counter.
-- [ ] P1 PT3 R2 isolation: r2BaseKey dolazi od klijenta (Inngest). Kad se integrira, generisati ga server-side iz userId/videoId (ne primati od klijenta).
-- [ ] P2 S1: FFmpeg stderr leak - filtrirati/truncirati stderr u error poruci koja ide klijentu (sadrzi interne putanje). Loguj interno, klijentu vrati samo "Processing failed".
-- [ ] P2 S2: R2 error response body leak - ne vracati R2 XML response tijelo klijentu.
-- [ ] P2 A1: Timing-safe WORKER_SECRET comparison u worker.ts (crypto.timingSafeEqual).
-- [ ] P2 V3: preset allowlist - validirati da je jedna od: ultrafast/superfast/veryfast/faster/fast/medium/slow/slower/veryslow.
-- [ ] P2 V4: crf range - validirati kao integer 0-51.
-- [ ] P3 DF1: Dockerfile - zamijeniti curl-pipe-bash Bun install sa FROM oven/bun:1.3.14-debian (pinned version, bez shell installer).
-- [ ] P3 DF2: Pinirati base image sa digest (@sha256:...) za reproducibilne buildove.
-- [ ] P3 DF3: Dodati non-root USER u Dockerfile (RUN useradd -r -u 1001 appuser && USER appuser).
+---
+
+## PRE-PRODUCTION CHECKLIST
+
+### Security — H4 dovršiti (browser test pending)
+- [ ] Browser test: upload flow — /api/upload/complete verifikuje storage i postavlja status uploading→uploaded
+- [ ] Browser test: process flow — admin client atomic claim (supabase user client uklonjen iz videos UPDATE)
+- [ ] Browser test: retry flow — /api/videos/[id]/retry resetuje failed→uploaded server-side
+- [ ] DROP POLICY "Users can update own videos" ON videos (TEK nakon browser testa, SQL: supabase/migrations/20260604000001_drop_videos_update_policy.sql)
+
+### Security — clip-worker (P1 = blokira produkciju)
+- [ ] P1 PROD-CRITICAL: clip-worker na javnom workers.dev — zatvoriti service bindingom (Next.js Worker ↔ clip-worker, nema javne URL) ILI custom domena + Cloudflare Access. Trenutno: samo Bearer auth + SSRF zaštita.
+- [ ] P1 A2: X-Worker-Secret header u Bun serveru (defense-in-depth za misconfiguration slučaj)
+- [ ] P1 D1: Streaming download hard byte-limit u Bun.write (Content-Length provjera postoji, ali nema cap na bytes written)
+- [ ] P2 S1: FFmpeg stderr leak — truncirati u error poruci klijentu, loguj interno
+- [ ] P2 S2: R2 error response body leak — ne vraćati XML klijentu
+- [ ] P2 A1: crypto.timingSafeEqual za WORKER_SECRET u worker.ts
+- [ ] P2 V3: preset allowlist validacija (ultrafast/superfast/…/veryslow)
+- [ ] P2 V4: crf validacija kao integer 0–51
+- [ ] P3 DF1: Dockerfile — FROM oven/bun:1.3.14-debian umjesto curl-pipe-bash
+- [ ] P3 DF2: Pin base image digest (@sha256:…)
+- [ ] P3 DF3: non-root USER u Dockerfile
+
+### Security — krediti/auth (preostalo iz Dani 1-6 review)
+- [ ] M1: refund_credits cap na max plan limit (sprječava dupli refund iznad plana)
+- [ ] M2: MIME enforce via signed URL Content-Type (ne samo JSON body validacija)
+- [ ] L1: auth/callback next param mora počinjati sa / (open redirect hardening)
+- [ ] L2: audit log za kredit transakcije u usage_logs (deduct + refund)
+- [ ] L3: reset_monthly_credits pozivač — Supabase scheduled job ili Inngest cron
+- [ ] L4: clip_count_requested validacija cleanup (redundantna provjera + integer/range)
+
+### Infrastruktura
+- [ ] Source video storage: migracija na R2 (Supabase free limit 1GB, large video uploads zahtijevaju R2)
+- [ ] Rotirati SVE tajne ključeve prije produkcije — dijeljeni u dev okruženju (Supabase, Groq, Anthropic, R2, Inngest, WORKER_SECRET, Creem)
+- [ ] Anthropic spend limit postaviti ($20/mj početni cap)
+- [ ] Creem payment integracija (Sedmica 3 po SPEC-u)
+
+### Kvalitet izlaza (po SPEC-u)
+- [ ] Portrait video edge case: crop=ih*9/16 daje negativan x za vertikalne izvore — detektovati aspect ratio prije cropa (clip-worker)
+- [ ] Day 13: Smart crop / face tracking (trenutno center-crop)
+- [ ] Day 14: Burned captions renderovanje (data već sačuvana rebazovano po klipu)
 
 ### Key Decisions
 - Next.js 16 + React 19 (not 14 as in original SPEC)
