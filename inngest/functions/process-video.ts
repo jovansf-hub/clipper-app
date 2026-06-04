@@ -4,6 +4,7 @@ import { transcribeAudio } from "@/lib/groq";
 import { analyzeViralMoments, type ViralMoment } from "@/lib/anthropic";
 import { callClipWorker } from "@/lib/clip-worker";
 import { getSignedSourceUrl } from "@/lib/supabase-storage";
+import { calculateCreditCorrection } from "@/lib/credit-verification";
 
 export const processVideo = inngest.createFunction(
   {
@@ -67,6 +68,77 @@ export const processVideo = inngest.createFunction(
 
       return result;
     });
+
+    const durationVerification = await step.run("verify-duration", async () => {
+      const supabase = createAdminClient();
+
+      const { data: video, error: videoErr } = await supabase
+        .from("videos")
+        .select("duration_seconds, credits_used")
+        .eq("id", videoId)
+        .single();
+      if (videoErr || !video) throw new Error(`Video not found during verify-duration: ${videoId}`);
+
+      const correction = calculateCreditCorrection({
+        realDurationSeconds:     transcription.duration,
+        reportedDurationSeconds: video.duration_seconds,
+        creditsUsed:             video.credits_used,
+      });
+
+      if (!correction.needsCorrection) {
+        return { verified: true, corrected: false, reason: "no_shortfall" };
+      }
+
+      // Tier boundary crossed — collect the difference.
+      const { error: deductErr } = await supabase.rpc("deduct_credits", {
+        p_user_id: userId,
+        p_credits: correction.diff,
+      });
+
+      if (deductErr) {
+        // Insufficient credits for the real duration.
+        // Refund the initial charge and mark failed.
+        await supabase.rpc("refund_credits", {
+          p_user_id: userId,
+          p_credits: video.credits_used,
+        });
+        await supabase
+          .from("videos")
+          .update({
+            status: "failed",
+            error_message: "Insufficient credits for actual video duration",
+            error_step: "verify-duration",
+          })
+          .eq("id", videoId);
+
+        // Return (don't throw): deterministic business failure, not a transient error.
+        // Throwing would trigger Inngest retries and re-attempt credit deduction.
+        return { verified: false, reason: "insufficient_credits" };
+      }
+
+      const realDuration = Math.ceil(transcription.duration);
+
+      // Persist real values so idempotency check passes on any subsequent retry.
+      await supabase
+        .from("videos")
+        .update({ duration_seconds: realDuration, credits_used: correction.realCredits })
+        .eq("id", videoId);
+
+      return {
+        verified:          true,
+        corrected:         true,
+        reportedDuration:  video.duration_seconds,
+        realDuration,
+        additionalCredits: correction.diff,
+      };
+    });
+
+    // Status already set to 'failed' and credits refunded inside the step.
+    // Return (not throw) so Inngest marks execution completed, preventing
+    // handleProcessVideoFailure from firing and double-refunding.
+    if (!durationVerification.verified) {
+      return { success: false, videoId, reason: "duration_verification_failed" };
+    }
 
     const viralAnalysis = await step.run("analyze-viral-moments", async () => {
       const supabase = createAdminClient();
