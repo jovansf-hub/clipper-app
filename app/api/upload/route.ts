@@ -47,6 +47,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Admin client used for all DB/RPC calls — can_user_upload and credit RPCs are
+    // REVOKED from authenticated role; service_role bypasses that restriction.
+    const admin = createAdminClient();
+
     const body = (await request.json()) as UploadBody;
     const {
       filename,
@@ -74,8 +78,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check upload eligibility via DB function
-    const { data: checkResult, error: rpcError } = await supabase.rpc(
+    // Check upload eligibility via DB function.
+    // Uses admin client — can_user_upload is REVOKED from authenticated role.
+    const { data: checkResult, error: rpcError } = await admin.rpc(
       "can_user_upload",
       {
         p_user_id: user.id,
@@ -119,7 +124,6 @@ export async function POST(request: Request) {
     }
 
     const creditsNeeded = check.credits_needed ?? getCreditsNeeded(Math.round(duration_seconds));
-    const admin = createAdminClient();
 
     // Fetch plan for retention calculation
     const { data: profile } = await admin

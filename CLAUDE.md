@@ -96,8 +96,8 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 
 ## RESUME POINT
 - Days 1-7 complete. Full pipeline: upload → transcribe → analyze → clip → R2 → UI viewer
-- Security hardening (Dani 1-6 review): H1 zatvoreno+dokazano, H2 primijenjeno, H3 implementirano+testirano, H4 kod spreman (browser test pending)
-- Next steps: H4 browser test → DROP UPDATE policy → pre-production checklist ispod
+- Security hardening (Dani 1-6 review): H1-H4 SVI ZATVORENI + TESTIRANI. H1 zatvoreno+dokazano, H2 primijenjeno, H3 implementirano+testirano, H4 dovršeno (3 flow-a testirana POSLIJE DROP policy)
+- Next steps: pre-production checklist ispod (clip-worker P1, krediti/auth M/L, infra, kvalitet izlaza, Upload UX redesign)
 
 ### Day 7a complete:
 - [x] clip-worker deployed (https://clip-worker.jovansf.workers.dev), 6 secrets
@@ -107,21 +107,24 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] UI: ClipsGrid + ClipCard (thumbnail, badge, score, preview, download)
 - [x] Verified end-to-end: real 73s video → 3 vertical 1080x1920 clips in R2
 
-### Security hardening complete (Dani 1-6):
+### Security hardening complete (Dani 1-6) — H1-H4 SVI DONE + TESTED:
 - [x] H1: SECURITY DEFINER RPCs zaštićene in-function service_role guard (5/5 napadački PASS)
 - [x] H2: videos UPDATE WITH CHECK primijenjeno (SQL migracija)
 - [x] H3: verify-duration Inngest step — Groq real duration, kredit korekcija, 6/6 unit testova
-- [x] H4 kod: /api/upload/complete + /api/videos/[id]/retry + process/route.ts → admin client
+- [x] H4: /api/upload/complete + /api/videos/[id]/retry + process/route.ts → admin client. UPDATE policy DROPPED (migracija 20260604000001). Sva 3 flow-a (upload/process/retry) testirana POSLIJE drop-a — rade.
 
 ---
 
 ## PRE-PRODUCTION CHECKLIST
 
-### Security — H4 dovršiti (browser test pending)
-- [ ] Browser test: upload flow — /api/upload/complete verifikuje storage i postavlja status uploading→uploaded
-- [ ] Browser test: process flow — admin client atomic claim (supabase user client uklonjen iz videos UPDATE)
-- [ ] Browser test: retry flow — /api/videos/[id]/retry resetuje failed→uploaded server-side
-- [ ] DROP POLICY "Users can update own videos" ON videos (TEK nakon browser testa, SQL: supabase/migrations/20260604000001_drop_videos_update_policy.sql)
+### Security — H4 DONE ✅ (sve zatvoreno + testirano)
+- [x] Browser test: upload flow — /api/upload/complete verifikuje storage i postavlja status uploading→uploaded
+- [x] Browser test: process flow — admin client atomic claim (supabase user client uklonjen iz videos UPDATE)
+- [x] Browser test: retry flow — /api/videos/[id]/retry resetuje failed→uploaded server-side
+- [x] DROP POLICY "Users can update own videos" ON videos (migracija 20260604000001_drop_videos_update_policy.sql) — sva 3 flow-a verifikovana POSLIJE drop-a
+
+### UX — Upload flow redesign (poslije H4)
+- [ ] Upload UX redesign (Opcija A): upload kreće odmah na drop (background) umjesto na klik dugmeta. Trenutno: dugme na uploaderu se zove "Start Processing" ali radi SAMO upload (mislabel), i fajl se ne uploaduje dok se ne klikne → korisnik misli da je uploadovano a nije. Plan: (a) kreiraj video red + počni upload na drop sa default configom, (b) novi server endpoint za config update (auth + ownership + validacija, kao H4 standard) koji se zove na kraju, (c) abandonment cleanup za 'uploaded-ali-nikad-procesiran' redove (troše Supabase storage), (d) preimenuj dugme jasno. Zahtijeva vlastiti test pass + mini security review novog config endpointa.
 
 ### Security — clip-worker (P1 = blokira produkciju)
 - [ ] P1 PROD-CRITICAL: clip-worker na javnom workers.dev — zatvoriti service bindingom (Next.js Worker ↔ clip-worker, nema javne URL) ILI custom domena + Cloudflare Access. Trenutno: samo Bearer auth + SSRF zaštita.

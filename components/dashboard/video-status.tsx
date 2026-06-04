@@ -160,28 +160,21 @@ export function VideoStatus({ initialVideo }: VideoStatusProps) {
   async function handleRetry() {
     setIsRetrying(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("videos")
-        .update({
-          status: "uploaded",
-          error_message: null,
-          error_step: null,
-          processing_started_at: null,
-        })
-        .eq("id", video.id);
-
-      if (error) {
-        toast.error("Failed to reset video status");
+      // Server resets status from 'failed' → 'uploaded', verifying ownership.
+      const retryRes = await fetch(`/api/videos/${video.id}/retry`, {
+        method: "POST",
+      });
+      if (!retryRes.ok) {
+        const err = (await retryRes.json()) as { error?: string };
+        toast.error(err.error ?? "Failed to reset video");
         return;
       }
 
-      const res = await fetch(`/api/videos/${video.id}/process`, {
+      const processRes = await fetch(`/api/videos/${video.id}/process`, {
         method: "POST",
       });
-
-      if (!res.ok) {
-        const err = (await res.json()) as { error?: string };
+      if (!processRes.ok) {
+        const err = (await processRes.json()) as { error?: string };
         toast.error(err.error ?? "Retry failed");
         return;
       }

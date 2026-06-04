@@ -228,10 +228,16 @@ export function VideoUploader({ plan, creditsRemaining }: VideoUploaderProps) {
 
       if (storageError) throw new Error(storageError.message);
 
-      await supabase
-        .from("videos")
-        .update({ status: "uploaded" })
-        .eq("id", data.videoId);
+      // Server verifies the file landed in storage before setting status='uploaded'.
+      const completeRes = await fetch("/api/upload/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: data.videoId }),
+      });
+      if (!completeRes.ok) {
+        const err = (await completeRes.json()) as { error?: string };
+        throw new Error(err.error ?? "Failed to confirm upload");
+      }
 
       toast.success("Upload complete! Processing will begin shortly.");
       router.push(`/videos/${data.videoId}`);

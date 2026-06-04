@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { inngest } from "@/inngest/client";
 import { NextResponse } from "next/server";
 
@@ -16,8 +16,12 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Atomic: update status only if video is owned by user AND currently 'uploaded'
-  const { data: updated, error: updateErr } = await supabase
+  const admin = createAdminClient();
+
+  // Atomic: update status only if video is owned by user AND currently 'uploaded'.
+  // Uses admin client — UPDATE policy on videos is removed after H4; ownership
+  // is enforced by the .eq("user_id", user.id) WHERE clause instead of RLS.
+  const { data: updated, error: updateErr } = await admin
     .from("videos")
     .update({
       status: "transcribing",
@@ -40,15 +44,16 @@ export async function POST(
     );
   }
 
-  // Deduct credits now that processing has been atomically claimed
-  const { error: deductErr } = await supabase.rpc("deduct_credits", {
+  // Deduct credits now that processing has been atomically claimed.
+  // Uses admin client (service_role) — deduct_credits is REVOKED from authenticated role.
+  const { error: deductErr } = await admin.rpc("deduct_credits", {
     p_user_id: user.id,
     p_credits: updated.credits_used,
   });
 
   if (deductErr) {
     // Roll back status so user can retry
-    await supabase
+    await admin
       .from("videos")
       .update({ status: "uploaded", processing_started_at: null })
       .eq("id", videoId);
