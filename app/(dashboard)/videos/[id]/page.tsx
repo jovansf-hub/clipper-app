@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDuration } from "@/lib/utils";
 import { VideoStatus } from "@/components/dashboard/video-status";
+import { DeleteVideoButton } from "@/components/dashboard/delete-video-button";
 import { ClipsGrid, type ClipGridItem } from "@/components/dashboard/clips-grid";
 import { getPresignedR2Url } from "@/lib/r2";
 import type { ViralAnalysisResult } from "@/lib/anthropic";
@@ -69,9 +70,18 @@ export default async function VideoPage({ params }: { params: Params }) {
         My Videos
       </Link>
 
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-        {video.title}
-      </h1>
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+          {video.title}
+        </h1>
+        <DeleteVideoButton
+          videoId={video.id}
+          status={video.status}
+          label="Delete"
+          redirectTo="/videos"
+          className="shrink-0"
+        />
+      </div>
 
       <VideoStatus
         initialVideo={{

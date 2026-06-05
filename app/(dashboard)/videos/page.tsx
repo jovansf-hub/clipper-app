@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { DeleteVideoButton } from "@/components/dashboard/delete-video-button";
 import { formatDuration } from "@/lib/utils";
 
 const STATUS_VARIANT = {
@@ -99,6 +100,9 @@ export default async function VideosPage() {
                         <div className="size-2 rounded-full bg-violet-500 animate-pulse" />
                       </div>
                     )}
+                    <div className="absolute top-2 right-2 z-10">
+                      <DeleteVideoButton videoId={video.id} status={video.status} />
+                    </div>
                   </div>
 
                   <CardContent className="p-4 space-y-2">
