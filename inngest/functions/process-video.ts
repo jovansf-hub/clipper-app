@@ -1,23 +1,118 @@
 import { inngest } from "../client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { transcribeAudio } from "@/lib/groq";
-import { analyzeViralMoments, type ViralMoment } from "@/lib/anthropic";
-import { callClipWorker } from "@/lib/clip-worker";
-import { getSignedSourceUrl } from "@/lib/supabase-storage";
+import { analyzeViralMoments, detectSubjectCenterX, type ViralMoment } from "@/lib/anthropic";
+import {
+  startClipWorker,
+  getClipWorkerStatus,
+  callExtractAudio,
+  callDetectKeyframes,
+  type StatusMarker,
+} from "@/lib/clip-worker";
+import { getPresignedR2Url } from "@/lib/r2";
 import { calculateCreditCorrection } from "@/lib/credit-verification";
+
+// A viral moment plus the stable clipId/cropX assigned at clip time. Generated
+// in the start-process step and memoized, so the same ids survive retries and
+// correlate worker output back to the moment when persisting.
+type ClipWithId = ViralMoment & { clipId: string; cropX?: number };
 
 export const processVideo = inngest.createFunction(
   {
     id: "process-video",
     name: "Process Video Pipeline",
-    retries: 2,
+    // One retry (2 attempts total): recovers a transient blip but bounds the
+    // failure loop to ~2x the step timeout before onFailure refunds — instead
+    // of 3 attempts tying up the charged credit for minutes. Per-step retries
+    // aren't supported in inngest@4.4.0, so this is function-wide.
+    retries: 1,
     triggers: [{ event: "video/uploaded" }],
+    // Fires exactly once after all retries are exhausted for THIS function.
+    // Inngest wires the match internally (no function_id string to maintain).
+    // Steps that handle their own failure (extract-audio >25MB, verify-duration
+    // insufficient, generate-clips) RETURN instead of throwing, so the function
+    // completes successfully and onFailure never fires for them — that's what
+    // keeps refunds to exactly once. onFailure only covers uncaught throws/timeouts.
+    onFailure: async ({ event, error, step }) => {
+      // event.data.event is the original `video/uploaded` event.
+      const { videoId, userId } = event.data.event.data as {
+        videoId: string;
+        userId: string;
+      };
+
+      // Guard: if the event payload shape ever changes, videoId/userId would be
+      // undefined and the queries below would silently no-op (.eq("id", undefined)
+      // matches 0 rows) — a missed refund with no signal. Fail LOUDLY instead.
+      if (!videoId || !userId) {
+        console.error(
+          `[onFailure] missing videoId/userId in event payload — cannot refund/mark-failed. ` +
+            `videoId=${String(videoId)} userId=${String(userId)}`
+        );
+        return;
+      }
+
+      // Atomic exactly-once refund + flip via refund_video_once: the RPC's
+      // credits_refunded guard makes a retry (or a concurrent stuck-recovery
+      // cron) a no-op, so the refund happens at most once. status flips to
+      // 'failed' and error_step is COALESCEd (no-overwrite) in the same tx.
+      // Single memoized step replaces the old refund + mark-failed pair.
+      await step.run("recover-failed-video", async () => {
+        const supabase = createAdminClient();
+        await supabase.rpc("refund_video_once", {
+          p_video_id: videoId,
+          p_error_step: "pipeline-failure",
+          p_error_message: error?.message || "Processing failed",
+        });
+      });
+    },
   },
   async ({ event, step }) => {
     const { videoId, userId } = event.data as {
       videoId: string;
       userId: string;
     };
+
+    // Warm the clip-worker container BEFORE any timed/credited work. The
+    // worker's /health goes through its readiness gate (waits up to ~30s for the
+    // container port, else 503), so a 200 here means the container is up and
+    // extract-audio won't eat a cold start. Pinging a separate keep-warm cron
+    // instance doesn't help — real requests hit the "main" container, which is
+    // exactly what /health here boots. GET only, no side effects, no credit cost.
+    // NOTE: inngest@4.4.0 has no per-step retry option (retries are function-wide
+    // — see above), so we retry the ping in-loop here instead of { retries: 3 }.
+    await step.run("warm-container", async () => {
+      const workerUrl = process.env.CLIP_WORKER_URL;
+      const workerSecret = process.env.CLIP_WORKER_SECRET;
+      if (!workerUrl) throw new Error("CLIP_WORKER_URL is not set");
+      if (!workerSecret) throw new Error("CLIP_WORKER_SECRET is not set");
+
+      const attempts = 4;
+      let lastErr = "";
+      for (let i = 0; i < attempts; i++) {
+        const controller = new AbortController();
+        // Slightly above the worker's ~30s readiness bound so a slow cold boot
+        // resolves within one attempt rather than aborting prematurely.
+        const timeoutId = setTimeout(() => controller.abort(), 35_000);
+        try {
+          const res = await fetch(`${workerUrl}/health`, {
+            headers: { Authorization: `Bearer ${workerSecret}` },
+            signal: controller.signal,
+          });
+          if (res.ok) return { warm: true, attempt: i + 1 };
+          lastErr = `status ${res.status}`;
+        } catch (err) {
+          lastErr = err instanceof Error ? err.message : String(err);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+        if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1_500));
+      }
+      // All pings failed — throw so the function-wide retry (retries: 1) gets one
+      // more shot before onFailure refunds. No credit spent yet at this point.
+      throw new Error(
+        `Container not ready after ${attempts} warm-up attempts: ${lastErr}`
+      );
+    });
 
     await step.run("update-status-transcribing", async () => {
       const supabase = createAdminClient();
@@ -31,24 +126,60 @@ export const processVideo = inngest.createFunction(
       if (error) throw error;
     });
 
+    // Extract a small Opus audio file from the source before transcription.
+    // Groq's free tier caps uploads at 25MB; a raw video easily exceeds that,
+    // so we downsample to 16kHz mono Opus @ 32kbps (~7MB for 30 min) first.
+    // Stays under status 'transcribing' — no new status/UI stage.
+    const audioExtraction = await step.run("extract-audio", async () => {
+      const supabase = createAdminClient();
+
+      const { data: video, error: videoErr } = await supabase
+        .from("videos")
+        .select("file_path")
+        .eq("id", videoId)
+        .single();
+      if (videoErr || !video) throw new Error(`Video not found: ${videoId}`);
+
+      // Source video lives in R2 (file_path is the R2 key).
+      const sourceUrl = await getPresignedR2Url(video.file_path, 3600);
+
+      const result = await callExtractAudio({ videoUrl: sourceUrl, videoId, userId });
+
+      const MAX_GROQ_BYTES = 25 * 1024 * 1024;
+      if (result.audioSizeBytes > MAX_GROQ_BYTES) {
+        // Even after compression the audio exceeds Groq's cap. Deterministic
+        // business failure — atomic refund + flip (exactly-once), then RETURN
+        // (not throw) so Inngest doesn't retry and the video is deletable.
+        await supabase.rpc("refund_video_once", {
+          p_video_id: videoId,
+          p_error_step: "extract-audio",
+          p_error_message: "Audio too long to transcribe",
+        });
+        return { ok: false as const };
+      }
+
+      return { ok: true as const, audioKey: result.audioKey };
+    });
+
+    if (!audioExtraction.ok) {
+      return { success: false, videoId, reason: "audio_too_large" };
+    }
+
     const transcription = await step.run("transcribe-audio", async () => {
       const supabase = createAdminClient();
 
       const { data: video, error: videoErr } = await supabase
         .from("videos")
-        .select("file_path, language")
+        .select("language")
         .eq("id", videoId)
         .single();
       if (videoErr || !video) throw new Error(`Video not found: ${videoId}`);
 
-      const { data: signedUrlData, error: urlErr } = await supabase.storage
-        .from("videos")
-        .createSignedUrl(video.file_path, 3600);
-      if (urlErr || !signedUrlData)
-        throw new Error(`Could not create signed URL: ${urlErr?.message}`);
+      // Transcribe the compressed audio extracted above (not the raw source).
+      const sourceUrl = await getPresignedR2Url(audioExtraction.audioKey, 3600);
 
       const result = await transcribeAudio(
-        signedUrlData.signedUrl,
+        sourceUrl,
         video.language ?? undefined
       );
 
@@ -96,20 +227,13 @@ export const processVideo = inngest.createFunction(
       });
 
       if (deductErr) {
-        // Insufficient credits for the real duration.
-        // Refund the initial charge and mark failed.
-        await supabase.rpc("refund_credits", {
-          p_user_id: userId,
-          p_credits: video.credits_used,
+        // Insufficient credits for the real duration. Atomic refund of the
+        // initial charge + flip to failed (exactly-once via refund_video_once).
+        await supabase.rpc("refund_video_once", {
+          p_video_id: videoId,
+          p_error_step: "verify-duration",
+          p_error_message: "Insufficient credits for actual video duration",
         });
-        await supabase
-          .from("videos")
-          .update({
-            status: "failed",
-            error_message: "Insufficient credits for actual video duration",
-            error_step: "verify-duration",
-          })
-          .eq("id", videoId);
 
         // Return (don't throw): deterministic business failure, not a transient error.
         // Throwing would trigger Inngest retries and re-attempt credit deduction.
@@ -186,50 +310,104 @@ export const processVideo = inngest.createFunction(
       return result;
     });
 
-    const clipResult = await step.run("generate-clips", async () => {
+    // Smart crop via Claude Vision. For each viral moment, the clip-worker
+    // extracts a keyframe at the moment's midpoint; we ask Haiku where the
+    // subject is and turn that into a pixel crop offset. Result is an array of
+    // cropX aligned by index to viralAnalysis.moments (null = center fallback).
+    // Stays under status 'analyzing' — no new status/UI stage. Fully degrades:
+    // any failure leaves cropX null and generate-clips center-crops.
+    const cropDetection = await step.run("detect-crop", async () => {
+      const moments = viralAnalysis.moments ?? [];
+      if (moments.length === 0) return { cropXByIndex: [] as (number | null)[] };
+
       const supabase = createAdminClient();
-
-      // 1. Status -> clipping
-      await supabase
-        .from("videos")
-        .update({ status: "clipping" })
-        .eq("id", videoId);
-
-      // 2. Read file_path + transcript_segments (not returned by prior steps)
       const { data: video, error: videoErr } = await supabase
         .from("videos")
-        .select("file_path, transcript_segments")
+        .select("file_path")
+        .eq("id", videoId)
+        .single();
+      if (videoErr || !video) throw new Error(`Video not found for detect-crop: ${videoId}`);
+
+      const sourceUrl = await getPresignedR2Url(video.file_path, 3600);
+      const keyframes = moments.map((m, i) => ({
+        momentId: String(i),
+        midSeconds: m.start_time + (m.end_time - m.start_time) / 2,
+      }));
+
+      // Worker extracts keyframes; on failure, center-crop every clip.
+      let kf;
+      try {
+        kf = await callDetectKeyframes({ videoUrl: sourceUrl, videoId, userId, keyframes });
+      } catch (err) {
+        console.error(
+          `[${videoId}] detect-keyframes failed — center crop for all clips: ` +
+            (err instanceof Error ? err.message : "unknown")
+        );
+        return { cropXByIndex: moments.map(() => null) };
+      }
+
+      const cropW = (kf.height * 9) / 16;
+      const maxX = Math.max(0, kf.width - cropW);
+      const frameById = new Map(kf.keyframes.map((k) => [k.momentId, k.jpegBase64]));
+
+      const cropXByIndex: (number | null)[] = [];
+      for (let i = 0; i < moments.length; i++) {
+        const jpeg = frameById.get(String(i));
+        if (!jpeg) {
+          cropXByIndex.push(null); // keyframe extraction failed → center crop
+          continue;
+        }
+        const centerFraction = await detectSubjectCenterX(jpeg); // [0,1], 0.5 on failure
+        const centerPx = centerFraction * kf.width;
+        const x = Math.round(Math.max(0, Math.min(centerPx - cropW / 2, maxX)));
+        cropXByIndex.push(x);
+      }
+
+      return { cropXByIndex };
+    });
+
+    // ── ASYNC clip job: start → poll → persist ───────────────────────────────
+    // /process now returns 202 and runs in the background (it outlives any HTTP
+    // connection). We kick it off, poll GET /status durably, then persist from
+    // the final marker. step.sleep (not setTimeout) keeps each poll a short,
+    // memoized step and each poll resets the container's sleepAfter (keep-alive).
+
+    // Kick off the job. Stable clipIds (randomUUID) are generated and memoized
+    // HERE, so they survive function retries and correlate worker output → moment.
+    const startResult = await step.run("start-process", async () => {
+      const supabase = createAdminClient();
+
+      await supabase.from("videos").update({ status: "clipping" }).eq("id", videoId);
+
+      const { data: video, error: videoErr } = await supabase
+        .from("videos")
+        .select("file_path")
         .eq("id", videoId)
         .single();
       if (videoErr || !video) throw new Error(`Video not found: ${videoId}`);
 
-      // 3. Idempotency: delete clips from any prior attempt so retries don't duplicate
-      await supabase.from("clips").delete().eq("video_id", videoId);
-
-      // 4. Moments from prior step — graceful exit if analysis found nothing
+      // Graceful exit if analysis found nothing to clip.
       const moments: ViralMoment[] = viralAnalysis.moments ?? [];
       if (moments.length === 0) {
+        await supabase.from("clips").delete().eq("video_id", videoId);
         await supabase
           .from("videos")
-          .update({
-            status: "completed",
-            processing_completed_at: new Date().toISOString(),
-          })
+          .update({ status: "completed", processing_completed_at: new Date().toISOString() })
           .eq("id", videoId);
-        return { clipsGenerated: 0, clipsFailed: 0 };
+        return { started: false as const, clipsWithIds: [] as ClipWithId[] };
       }
 
-      // 5. Stable clipId per moment (used to correlate worker response back to moment)
-      const clipsWithIds = moments.map((m) => ({
+      // cropX from detect-crop is aligned by index; null → omit so worker center-crops.
+      const clipsWithIds: ClipWithId[] = moments.map((m, i) => ({
         ...m,
         clipId: crypto.randomUUID(),
+        cropX: cropDetection.cropXByIndex[i] ?? undefined,
       }));
 
-      // 6. Presigned source URL for worker to download
-      const videoUrl = await getSignedSourceUrl(video.file_path, 3600);
+      const videoUrl = await getPresignedR2Url(video.file_path, 3600);
 
-      // 7. Call clip-worker — snake_case moment fields -> camelCase worker payload
-      const workerResponse = await callClipWorker({
+      // snake_case moment fields -> camelCase worker payload. Expects 202.
+      const start = await startClipWorker({
         videoUrl,
         videoId,
         userId,
@@ -238,117 +416,187 @@ export const processVideo = inngest.createFunction(
           startSeconds: m.start_time,
           endSeconds: m.end_time,
           title: m.title,
+          cropX: m.cropX,
         })),
       });
+      if (!start.accepted) throw new Error(`clip-worker did not accept /process for ${videoId}`);
 
-      if (workerResponse.failed.length > 0) {
-        console.warn(
-          `[${videoId}] ${workerResponse.failed.length} clip(s) failed in worker: ` +
-            workerResponse.failed.map((f) => `${f.clipId}(${f.error})`).join(", ")
+      return { started: true as const, clipsWithIds };
+    });
+
+    let clipResult: { clipsGenerated: number; clipsFailed: number };
+
+    if (!startResult.started) {
+      // No moments — already marked completed in start-process.
+      clipResult = { clipsGenerated: 0, clipsFailed: 0 };
+    } else {
+      // Durable poll: GET /status every 10s. Budget scales with clip count so a
+      // many-clip job (sequential encode) isn't falsely timed out: maxPolls =
+      // clamp(30 + clipCount*10, 60, 180) → 3 clips ~10 min, 15 clips ~30 min.
+      // step.sleep is durable (Inngest doesn't bill the wait); the cap bounds how
+      // long a genuinely dead job waits before timeout → refund (UX only).
+      const clipCount = startResult.clipsWithIds.length;
+      const maxPolls = Math.min(180, Math.max(60, 30 + clipCount * 10));
+      let finalStatus: StatusMarker | null = null;
+      for (let i = 0; i < maxPolls; i++) {
+        const status = await step.run(`poll-${i}`, async (): Promise<StatusMarker> => {
+          try {
+            return await getClipWorkerStatus(videoId, userId);
+          } catch (err) {
+            // Transient (network / timeout / abort / 5xx) — NOT the deterministic
+            // worker failure, which arrives as a RETURNED status:"failed" below.
+            // Throwing here would burn the function's single retry on a mid-poll
+            // blip; instead treat it as "keep waiting" and re-check next tick. A
+            // persistently failing /status still resolves via the budget timeout.
+            console.warn(
+              `[${videoId}] poll ${i} transient error, retrying next tick: ` +
+                (err instanceof Error ? err.message : String(err))
+            );
+            return { status: "processing" };
+          }
+        });
+        if (status.status === "completed") {
+          finalStatus = status;
+          break;
+        }
+        if (status.status === "failed") {
+          // Deterministic worker failure → throw so retries/onFailure handle refund.
+          throw new Error(status.error ?? "clip worker reported failure");
+        }
+        // "processing" | "not_found" → keep waiting.
+        await step.sleep(`wait-${i}`, "10s");
+      }
+      if (!finalStatus) {
+        throw new Error(
+          `clip worker polling timed out after ${maxPolls * 10}s (${clipCount} clip(s)) for ${videoId}`
         );
       }
+      // Capture in a const so the closure below keeps the narrowed (non-null) type.
+      const marker = finalStatus;
 
-      // 8. Rebase transcript segments/words onto clip-local time (0 = clip start)
-      const transcriptData = video.transcript_segments as {
-        segments?: Array<{ id?: number; start: number; end: number; text: string }>;
-        words?: Array<{ word: string; start: number; end: number }>;
-      } | null;
-      const allSegments = transcriptData?.segments ?? [];
-      const allWords = transcriptData?.words ?? [];
+      // Persist from the final marker — same rebase + insert logic as the old
+      // sync path, just sourced from the polled marker instead of a response.
+      clipResult = await step.run("persist-clips", async () => {
+        const supabase = createAdminClient();
 
-      let insertSuccessCount = 0;
+        const workerClips = marker.clips ?? [];
+        const workerFailed = marker.failed ?? [];
 
-      for (const result of workerResponse.clips) {
-        const moment = clipsWithIds.find((m) => m.clipId === result.clipId);
-        if (!moment) continue;
+        if (workerFailed.length > 0) {
+          console.warn(
+            `[${videoId}] ${workerFailed.length} clip(s) failed in worker: ` +
+              workerFailed.map((f) => `${f.clipId}(${f.error})`).join(", ")
+          );
+        }
 
-        const start = moment.start_time;
-        const end = moment.end_time;
+        // Re-read transcript for caption rebasing (kept in DB, not passed through
+        // steps). credits_used is read inside refund_video_once, not here.
+        const { data: video, error: videoErr } = await supabase
+          .from("videos")
+          .select("transcript_segments")
+          .eq("id", videoId)
+          .single();
+        if (videoErr || !video) throw new Error(`Video not found: ${videoId}`);
 
-        const rebasedSegments = allSegments
-          .filter((s) => s.end > start && s.start < end)
-          .map((s) => ({
-            ...s,
-            start: Math.max(0, s.start - start),
-            end: Math.max(0, s.end - start),
-          }));
+        // Idempotency: clear any prior attempt's rows before re-inserting.
+        await supabase.from("clips").delete().eq("video_id", videoId);
 
-        const rebasedWords = allWords
-          .filter((w) => w.end > start && w.start < end)
-          .map((w) => ({
-            ...w,
-            start: Math.max(0, w.start - start),
-            end: Math.max(0, w.end - start),
-          }));
+        const transcriptData = video.transcript_segments as {
+          segments?: Array<{ id?: number; start: number; end: number; text: string }>;
+          words?: Array<{ word: string; start: number; end: number }>;
+        } | null;
+        const allSegments = transcriptData?.segments ?? [];
+        const allWords = transcriptData?.words ?? [];
 
-        const { error: insertErr } = await supabase.from("clips").insert({
-          video_id: videoId,
-          user_id: userId,
-          start_time_seconds: moment.start_time,
-          end_time_seconds: moment.end_time,
-          duration_seconds: result.durationSeconds,
-          title: moment.title,
-          viral_score: moment.viral_score,
-          viral_reasoning: moment.reasoning,
-          hook_type: moment.hook_type,
-          output_path: result.r2Key,
-          thumbnail_path: result.thumbnailKey,
-          file_size_bytes: result.fileSizeBytes,
-          captions: { segments: rebasedSegments, words: rebasedWords },
+        const clipsWithIds = startResult.clipsWithIds;
+        let insertSuccessCount = 0;
+
+        for (const result of workerClips) {
+          const moment = clipsWithIds.find((m) => m.clipId === result.clipId);
+          if (!moment) continue;
+
+          const start = moment.start_time;
+          const end = moment.end_time;
+
+          const rebasedSegments = allSegments
+            .filter((s) => s.end > start && s.start < end)
+            .map((s) => ({
+              ...s,
+              start: Math.max(0, s.start - start),
+              end: Math.max(0, s.end - start),
+            }));
+
+          const rebasedWords = allWords
+            .filter((w) => w.end > start && w.start < end)
+            .map((w) => ({
+              ...w,
+              start: Math.max(0, w.start - start),
+              end: Math.max(0, w.end - start),
+            }));
+
+          const { error: insertErr } = await supabase.from("clips").insert({
+            video_id: videoId,
+            user_id: userId,
+            start_time_seconds: moment.start_time,
+            end_time_seconds: moment.end_time,
+            duration_seconds: result.durationSeconds,
+            title: moment.title,
+            viral_score: moment.viral_score,
+            viral_reasoning: moment.reasoning,
+            hook_type: moment.hook_type,
+            output_path: result.r2Key,
+            thumbnail_path: result.thumbnailKey,
+            file_size_bytes: result.fileSizeBytes,
+            captions: { segments: rebasedSegments, words: rebasedWords },
+          });
+
+          if (insertErr) {
+            console.error(
+              `[${videoId}] DB insert failed for clip ${result.clipId}: ${insertErr.message}`
+            );
+          } else {
+            insertSuccessCount++;
+          }
+        }
+
+        // Worker finished but nothing usable — deterministic failure, skip retry
+        // (a thrown status="failed" is the retry path; this means data is bad).
+        if (insertSuccessCount === 0) {
+          const errorMsg =
+            workerClips.length === 0
+              ? (marker.error ?? `All ${clipsWithIds.length} clips failed in worker`)
+              : `All ${workerClips.length} clip DB inserts failed`;
+          // Worker finished but nothing usable, and this branch RETURNs (not
+          // throws) so onFailure never fires — refund must happen here. Atomic
+          // refund + flip via refund_video_once (exactly-once: the
+          // credits_refunded guard prevents a double-refund on step retry).
+          await supabase.rpc("refund_video_once", {
+            p_video_id: videoId,
+            p_error_step: "generate-clips",
+            p_error_message: errorMsg,
+          });
+          return {
+            clipsGenerated: 0,
+            clipsFailed: workerFailed.length + workerClips.length,
+          };
+        }
+
+        await supabase.rpc("increment_clips_total", {
+          p_user_id: userId,
+          p_amount: insertSuccessCount,
         });
 
-        if (insertErr) {
-          console.error(
-            `[${videoId}] DB insert failed for clip ${result.clipId}: ${insertErr.message}`
-          );
-        } else {
-          insertSuccessCount++;
-        }
-      }
-
-      // Worker responded but nothing usable — deterministic failure, skip retry
-      // (callClipWorker throwing is the retry path; this branch means Worker is up but data is bad)
-      if (insertSuccessCount === 0) {
-        const errorMsg =
-          workerResponse.clips.length === 0
-            ? (workerResponse.error ?? `All ${moments.length} clips failed in worker`)
-            : `All ${workerResponse.clips.length} clip DB inserts failed`;
         await supabase
           .from("videos")
-          .update({
-            status: "failed",
-            error_message: errorMsg,
-            error_step: "generate-clips",
-          })
+          .update({ status: "completed", processing_completed_at: new Date().toISOString() })
           .eq("id", videoId);
+
         return {
-          clipsGenerated: 0,
-          clipsFailed: workerResponse.failed.length + workerResponse.clips.length,
+          clipsGenerated: insertSuccessCount,
+          clipsFailed: workerFailed.length + (workerClips.length - insertSuccessCount),
         };
-      }
-
-      // 10. Atomic counter update
-      await supabase.rpc("increment_clips_total", {
-        p_user_id: userId,
-        p_amount: insertSuccessCount,
       });
-
-      // 11. Mark completed
-      await supabase
-        .from("videos")
-        .update({
-          status: "completed",
-          processing_completed_at: new Date().toISOString(),
-        })
-        .eq("id", videoId);
-
-      return {
-        clipsGenerated: insertSuccessCount,
-        clipsFailed:
-          workerResponse.failed.length +
-          (workerResponse.clips.length - insertSuccessCount),
-      };
-    });
+    }
 
     return {
       success: true,
@@ -360,47 +608,5 @@ export const processVideo = inngest.createFunction(
       clipsGenerated: clipResult.clipsGenerated,
       clipsFailed: clipResult.clipsFailed,
     };
-  }
-);
-
-export const handleProcessVideoFailure = inngest.createFunction(
-  {
-    id: "process-video-failure",
-    triggers: [{ event: "inngest/function.failed" }],
-  },
-  async ({ event }) => {
-    const data = event.data as {
-      function_id: string;
-      event: { data: { videoId: string } };
-      error?: { message?: string };
-      step_name?: string;
-    };
-
-    if (data.function_id !== "process-video") return;
-
-    const supabase = createAdminClient();
-    const videoId = data.event.data.videoId;
-
-    const { data: video } = await supabase
-      .from("videos")
-      .select("user_id, credits_used")
-      .eq("id", videoId)
-      .single();
-
-    if (video && video.credits_used > 0) {
-      await supabase.rpc("refund_credits", {
-        p_user_id: video.user_id,
-        p_credits: video.credits_used,
-      });
-    }
-
-    await supabase
-      .from("videos")
-      .update({
-        status: "failed",
-        error_message: data.error?.message || "Unknown error",
-        error_step: data.step_name || "unknown",
-      })
-      .eq("id", videoId);
   }
 );
