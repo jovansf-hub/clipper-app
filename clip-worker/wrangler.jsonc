@@ -7,6 +7,12 @@
   "account_id": "484db7007332a20354d7638f623dd2de",
   "workers_dev": true,
 
+  // Diagnostic phase breadcrumbs (_ea/_dk/_cl_phase.json) + [timing] logs.
+  // "false" → off (zero R2/log overhead). Set to "true" + redeploy to re-enable.
+  "vars": {
+    "DEBUG_PHASE_MARKERS": "false"
+  },
+
   // Container config — points to Dockerfile in same directory.
   // max_instances: how many parallel containers can run simultaneously.
   // Container env vars (R2_*) must be set separately — see setup below.
@@ -35,7 +41,21 @@
       "tag": "v1",
       "new_sqlite_classes": ["ClipContainer"]
     }
-  ]
+  ],
+
+  // Required to surface container stdout/stderr in `wrangler tail` and the
+  // dashboard Logs view (Workers & Pages → clip-worker → Observability).
+  // Without this, container console output is not captured.
+  "observability": {
+    "enabled": true
+  },
+
+  // Cron Trigger — keep-warm ping. Every 9 minutes the scheduled() handler
+  // boots the container (if asleep) and hits /health, so it stays under the
+  // sleepAfter ("10m") hibernation window and user requests avoid cold starts.
+  "triggers": {
+    "crons": ["*/9 * * * *"]
+  }
 
   // ---------------------------------------------------------------------------
   // SECRETS — set these via CLI before deploying, NEVER put values here:

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev:server": "bun run src/server.ts",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.0.10",
@@ -13,6 +14,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",
+    "bun-types": "^1.3.14",
     "typescript": "^5.4.0",
     "wrangler": "^4.0.0"
   }
