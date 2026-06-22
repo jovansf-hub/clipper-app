@@ -97,7 +97,8 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 ## RESUME POINT
 - Days 1-7 complete. Full pipeline: upload → transcribe → analyze → clip → R2 → UI viewer
 - Security hardening (Dani 1-6 review): H1-H4 SVI ZATVORENI + TESTIRANI. H1 zatvoreno+dokazano, H2 primijenjeno, H3 implementirano+testirano, H4 dovršeno (3 flow-a testirana POSLIJE DROP policy)
-- Next steps: pre-production checklist ispod (clip-worker P1, krediti/auth M/L, infra, kvalitet izlaza, Upload UX redesign)
+- Day 7b IMPLEMENTIRANO (audio extraction Opus 32k + delete/stuck 15-min fix), clip-worker redeploy fcd39a42 live — ALI čeka ručni end-to-end test (vidi Day 7b blok dole, ⚠️)
+- Next steps: potvrditi Day 7b e2e test; pa pre-production checklist ispod (clip-worker P1, krediti/auth M/L, infra, kvalitet izlaza, Upload UX redesign)
 
 ### Day 7a complete:
 - [x] clip-worker deployed (https://clip-worker.jovansf.workers.dev), 6 secrets
@@ -106,6 +107,16 @@ Build an AI video clipping SaaS that competes with Opus Clip and Vugola. Target:
 - [x] Presigned R2 URLs: thumbnails server-side na load, mp4 lazy na klik
 - [x] UI: ClipsGrid + ClipCard (thumbnail, badge, score, preview, download)
 - [x] Verified end-to-end: real 73s video → 3 vertical 1080x1920 clips in R2
+
+### Day 7b — Audio extraction + delete/stuck fix (IMPLEMENTIRANO, NIJE END-TO-END TESTIRANO):
+- [~] clip-worker `POST /extract-audio`: download source → ffmpeg Opus 16kHz mono 32k (.ogg) → R2 `sources/{userId}/{videoId}.audio.ogg` → vraća {audioKey, audioSizeBytes, durationSeconds}. Reuse zaštita: Bearer (worker.ts), validateVideoUrl, sanitizeId.
+- [~] Inngest `extract-audio` step PRIJE transcribe (ostaje status 'transcribing', bez novog statusa/UI stagea). transcribe sada presignuje audioKey (mali audio), ne sirovi source.
+- [~] >25MB poslije kompresije → refund_credits + status='failed' (error_message='Audio too long to transcribe') + RETURN (ne throw) — odmah obrisiv, bez retry. Procjena: 30 min ≈ ~7.2 MB na 32k.
+- [~] groq.ts guard ostaje kao safety-net (poruka popravljena).
+- [~] DELETE: 15-min stuck prag za in-flight statuse (transcribing/analyzing/clipping) — dozvoljava recovery zaglavljenih. Source cleanup preko listR2Objects('sources/{userId}/{videoId}') prefiksa (hvata source + .audio.ogg).
+- [x] clip-worker REDEPLOYOVAN: verzija fcd39a42 (Version ID fcd39a42-adc3-4641-a162-e5a714ce3936), live na https://clip-worker.jovansf.workers.dev
+- [x] tsc --noEmit čist, npm run build zelen
+- ⚠️ NAPOMENA: pun end-to-end test (real video → extract → transcribe → clips) JOŠ NIJE URAĐEN — korisnik testira ručno. NE označavati kao potpuno završeno dok test ne prođe.
 
 ### Security hardening complete (Dani 1-6) — H1-H4 SVI DONE + TESTED:
 - [x] H1: SECURITY DEFINER RPCs zaštićene in-function service_role guard (5/5 napadački PASS)

@@ -6,8 +6,14 @@ type Params = Promise<{ id: string }>;
 
 // In-flight statuses: a live Inngest job may still be writing to this video
 // (DB row, R2 uploads). Deleting now would race it / orphan freshly-written
-// objects, so we refuse. See CLAUDE.md "stuck video recovery" TODO.
+// objects. We refuse UNLESS the job looks dead — see STUCK_THRESHOLD_MS below.
 const IN_FLIGHT = new Set(["transcribing", "analyzing", "clipping"]);
+
+// Stuck recovery: if a video has sat in an in-flight status this long, the
+// Inngest job almost certainly died (no timeout/refund fired). Past this
+// threshold we allow delete so the user isn't stranded. The race window with a
+// still-live job is gone by 15 min (processing steps are minutes, not hours).
+const STUCK_THRESHOLD_MS = 15 * 60 * 1000;
 
 export async function DELETE(
   _request: Request,
@@ -29,7 +35,7 @@ export async function DELETE(
   // Ownership check: scope by user_id so a non-owner gets an indistinguishable 404.
   const { data: video } = await admin
     .from("videos")
-    .select("id, file_path, status")
+    .select("id, file_path, status, processing_started_at")
     .eq("id", videoId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -38,12 +44,21 @@ export async function DELETE(
     return NextResponse.json({ error: "Video not found" }, { status: 404 });
   }
 
-  // Status guard — never delete while a job could be writing.
+  // Status guard — never delete while a job could be writing, UNLESS the job
+  // has been in-flight past STUCK_THRESHOLD_MS (presumed dead → allow recovery).
   if (IN_FLIGHT.has(video.status)) {
-    return NextResponse.json(
-      { error: "Cannot delete while processing" },
-      { status: 409 }
-    );
+    const startedAt = video.processing_started_at
+      ? new Date(video.processing_started_at).getTime()
+      : null;
+    const isStuck =
+      startedAt !== null && Date.now() - startedAt > STUCK_THRESHOLD_MS;
+
+    if (!isStuck) {
+      return NextResponse.json(
+        { error: "Cannot delete while processing" },
+        { status: 409 }
+      );
+    }
   }
 
   // ── STRICT external cleanup first; DB row deleted ONLY if everything below
@@ -78,34 +93,34 @@ export async function DELETE(
     );
   }
 
-  // 2. Supabase Storage source video under {userId}/{videoId}/
+  // 2. R2 source objects under sources/{userId}/{videoId} — this prefix covers
+  //    both the raw source (…/{videoId}.{ext}) and the extracted audio
+  //    (…/{videoId}.audio.ogg), so a single list+delete sweep cleans both.
   try {
-    const lastSlash = video.file_path.lastIndexOf("/");
-    const folder = video.file_path.slice(0, lastSlash);
+    const sourcePrefix = `sources/${user.id}/${videoId}`;
+    const sourceKeys = await listR2Objects(sourcePrefix);
 
-    const { data: files, error: listError } = await admin.storage
-      .from("videos")
-      .list(folder);
+    // listR2Objects matches by prefix string, not path boundary. Guard against
+    // a sibling id that shares this id as a prefix (e.g. {videoId} vs
+    // {videoId}2): only delete the exact source or its ".audio.*" companion.
+    const ownKeys = sourceKeys.filter(
+      (k) => k === video.file_path || k.startsWith(`${sourcePrefix}.`)
+    );
 
-    if (listError) {
+    let failedCount = 0;
+    for (const key of ownKeys) {
+      try {
+        await deleteR2Object(key);
+      } catch {
+        failedCount += 1;
+      }
+    }
+
+    if (failedCount > 0) {
       return NextResponse.json(
         { error: "Failed to clean up source storage. Please retry." },
         { status: 500 }
       );
-    }
-
-    if (files && files.length > 0) {
-      const paths = files.map((f) => `${folder}/${f.name}`);
-      const { error: removeError } = await admin.storage
-        .from("videos")
-        .remove(paths);
-
-      if (removeError) {
-        return NextResponse.json(
-          { error: "Failed to clean up source storage. Please retry." },
-          { status: 500 }
-        );
-      }
     }
   } catch {
     return NextResponse.json(

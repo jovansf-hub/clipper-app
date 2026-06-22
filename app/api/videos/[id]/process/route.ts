@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { inngest } from "@/inngest/client";
+import { checkInFlightCap } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -17,6 +18,17 @@ export async function POST(
   }
 
   const admin = createAdminClient();
+
+  // #3 rate limit: block starting a new job if the user is already at their
+  // in-flight concurrency cap. The target video is still 'uploaded' (not an
+  // in-flight status), so it isn't self-counted.
+  const rate = await checkInFlightCap(admin, user.id);
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: rate.error },
+      { status: rate.status, headers: { "Retry-After": String(rate.retryAfter) } }
+    );
+  }
 
   // Atomic: update status only if video is owned by user AND currently 'uploaded'.
   // Uses admin client — UPDATE policy on videos is removed after H4; ownership

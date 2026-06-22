@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getCreditsNeeded } from "@/lib/utils";
-
-// TODO: raise to 500MB when on paid Supabase storage plan
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+import { getPresignedR2PutUrl, deleteR2Object } from "@/lib/r2";
+import { checkUploadRate } from "@/lib/rate-limit";
+import { MAX_FILE_SIZE, MAX_FILE_SIZE_LABEL } from "@/lib/constants";
 
 const ALLOWED_MIME_TYPES = new Set([
   "video/mp4",
@@ -13,6 +13,16 @@ const ALLOWED_MIME_TYPES = new Set([
   "audio/mp4",
   "audio/wav",
 ]);
+
+// Fallback file extension when the original filename has none we can trust.
+const EXT_BY_MIME: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/wav": "wav",
+};
 
 const RETENTION_DAYS: Record<string, number> = {
   free: 7,
@@ -51,6 +61,15 @@ export async function POST(request: Request) {
     // REVOKED from authenticated role; service_role bypasses that restriction.
     const admin = createAdminClient();
 
+    // #3 rate limit: in-flight concurrency cap + rolling-hour upload cap.
+    const rate = await checkUploadRate(admin, user.id);
+    if (!rate.ok) {
+      return NextResponse.json(
+        { error: rate.error },
+        { status: rate.status, headers: { "Retry-After": String(rate.retryAfter) } }
+      );
+    }
+
     const body = (await request.json()) as UploadBody;
     const {
       filename,
@@ -66,7 +85,7 @@ export async function POST(request: Request) {
     // Validate file size and type
     if (file_size_bytes > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Max 50MB on free storage. Pro storage coming soon." },
+        { error: `File too large. Max ${MAX_FILE_SIZE_LABEL}.` },
         { status: 400 }
       );
     }
@@ -154,10 +173,13 @@ export async function POST(request: Request) {
     const retention = RETENTION_DAYS[userPlan] ?? 7;
     const expiresAt = new Date(Date.now() + retention * 86_400_000).toISOString();
 
-    // Generate storage path
+    // Generate R2 source key: sources/{userId}/{videoId}.{ext}
     const videoId = crypto.randomUUID();
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${user.id}/${videoId}/${safeFilename}`;
+    const rawExt = filename.includes(".")
+      ? filename.split(".").pop()!.toLowerCase()
+      : "";
+    const ext = /^[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : (EXT_BY_MIME[mime_type] ?? "bin");
+    const storagePath = `sources/${user.id}/${videoId}.${ext}`;
     const title = filename.replace(/\.[^.]+$/, "");
 
     // Enforce clip count limit by plan
@@ -190,12 +212,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate signed upload URL
-    const { data: signed, error: signedError } = await admin.storage
-      .from("videos")
-      .createSignedUploadUrl(storagePath);
-
-    if (signedError || !signed) {
+    // Generate R2 presigned PUT URL. The client PUTs the raw file with the
+    // returned contentType header; size is enforced authoritatively (HEAD) in
+    // /api/upload/complete once the object lands.
+    let uploadUrl: string;
+    try {
+      uploadUrl = await getPresignedR2PutUrl(storagePath, 3600);
+    } catch {
       // Rollback video row
       await admin.from("videos").delete().eq("id", videoId);
       return NextResponse.json(
@@ -205,10 +228,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      signedUrl: signed.signedUrl,
+      uploadUrl,
       videoId,
-      token: signed.token,
-      path: storagePath,
+      key: storagePath,
+      contentType: mime_type,
     });
   } catch {
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
@@ -238,7 +261,7 @@ export async function DELETE(request: Request) {
 
     const { data: video } = await admin
       .from("videos")
-      .select("id, user_id, status")
+      .select("id, user_id, status, file_path")
       .eq("id", videoId)
       .single();
 
@@ -256,6 +279,10 @@ export async function DELETE(request: Request) {
         { status: 400 }
       );
     }
+
+    // Best-effort: remove any partially-uploaded R2 object so abandoned uploads
+    // don't accumulate. Idempotent — deleting a missing key is a no-op.
+    await deleteR2Object(video.file_path).catch(() => undefined);
 
     await admin.from("videos").delete().eq("id", videoId);
 

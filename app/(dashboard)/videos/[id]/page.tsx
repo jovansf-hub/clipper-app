@@ -91,6 +91,7 @@ export default async function VideoPage({ params }: { params: Params }) {
           transcript_text: video.transcript_text ?? null,
           viral_analysis: (video.viral_analysis ?? null) as ViralAnalysisResult | null,
         }}
+        clipCount={clips.length}
       />
 
       <Card>
@@ -153,7 +154,7 @@ export default async function VideoPage({ params }: { params: Params }) {
       </Card>
 
       {video.status === "completed" && (
-        <Card>
+        <Card id="clips">
           <CardHeader>
             <CardTitle className="text-base">
               Clips {clips.length > 0 && `(${clips.length})`}

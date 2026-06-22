@@ -37,6 +37,57 @@ export async function getPresignedR2Url(
   return signed.url;
 }
 
+/**
+ * Presigned PUT URL for uploading a source object directly from the browser.
+ *
+ * Content-Type is intentionally NOT part of the signature: aws4fetch lists
+ * `content-type` in UNSIGNABLE_HEADERS, so signing it would require
+ * `allHeaders: true` and force the client to send a byte-exact match or get a
+ * 403. The client still sends a Content-Type header on the PUT, so R2 stores it
+ * as the object's content type — it's just outside the signature, which removes
+ * the mismatch risk. Only `host` is signed (same as getPresignedR2Url above).
+ */
+export async function getPresignedR2PutUrl(
+  key: string,
+  expiresIn = 3600
+): Promise<string> {
+  const r2 = getR2Client();
+  const { endpoint, bucket } = getR2Base();
+
+  const urlObj = new URL(`${endpoint}/${bucket}/${key}`);
+  urlObj.searchParams.set("X-Amz-Expires", String(expiresIn));
+
+  const signed = await r2.sign(
+    new Request(urlObj.toString(), { method: "PUT" }),
+    { aws: { signQuery: true } }
+  );
+  return signed.url;
+}
+
+/**
+ * HEAD an object to confirm it exists and read its authoritative size.
+ * Returns { exists:false } on 404. Throws on other non-OK responses.
+ */
+export async function headR2Object(
+  key: string
+): Promise<{ exists: boolean; size: number | null }> {
+  const r2 = getR2Client();
+  const { endpoint, bucket } = getR2Base();
+
+  const res = await r2.fetch(`${endpoint}/${bucket}/${encodeR2Key(key)}`, {
+    method: "HEAD",
+  });
+
+  if (res.status === 404) return { exists: false, size: null };
+  if (!res.ok) {
+    console.error(`R2 head failed (${res.status}) for key ${key}`);
+    throw new Error("R2 head failed");
+  }
+
+  const len = res.headers.get("content-length");
+  return { exists: true, size: len !== null ? Number(len) : null };
+}
+
 // Encode each path segment but preserve the slash separators between them.
 function encodeR2Key(key: string): string {
   return key.split("/").map(encodeURIComponent).join("/");

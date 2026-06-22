@@ -61,6 +61,17 @@ export interface StatusMarker {
   clipsTotalMs?: number;
 }
 
+// Shape of the async audio-extraction marker (GET /status?phase=audio).
+export interface AudioStatusMarker {
+  status: "processing" | "completed" | "failed" | "not_found";
+  startedAt?: number;
+  audioKey?: string;
+  audioSizeBytes?: number;
+  durationSeconds?: number;
+  error?: string;
+  processingMs?: number;
+}
+
 export interface KeyframeSpec {
   momentId: string;
   midSeconds: number;
@@ -70,19 +81,6 @@ export interface DetectKeyframesResult {
   width: number;
   height: number;
   keyframes: Array<{ momentId: string; jpegBase64: string }>;
-}
-
-export interface ExtractAudioResult {
-  audioKey: string;
-  audioSizeBytes: number;
-  durationSeconds: number;
-  timings?: {
-    downloadMs: number;
-    ffmpegMs: number;
-    uploadMs: number;
-    totalMs: number;
-    sourceBytes: number;
-  };
 }
 
 // /process is now async: POST returns 202 almost immediately (marker read+write
@@ -118,13 +116,6 @@ function isAbortError(err: unknown): boolean {
 // Keyframe extraction is one source download + N single-frame seeks — bounded
 // at 3 minutes so a slow/hung download fails the step rather than hanging.
 const DETECT_KEYFRAMES_TIMEOUT_MS = 3 * 60 * 1000;
-
-// Hard 5-minute cap for extract-audio. Downloading a large source + Opus
-// transcode realistically runs 3+ min on standard-1, so 2 min aborted healthy
-// jobs. If the worker still doesn't respond in time the fetch aborts, the step
-// throws, and (after the single retry) onFailure refunds — rather than tying up
-// the charged credit indefinitely.
-const EXTRACT_AUDIO_TIMEOUT_MS = 5 * 60 * 1000;
 
 // Kick off the async /process job. Expects 202 Accepted (the container runs the
 // work in the background and writes progress to an R2 marker). Does NOT wait for
@@ -285,11 +276,17 @@ export async function callDetectKeyframes(params: {
   return (await body.json()) as DetectKeyframesResult;
 }
 
-export async function callExtractAudio(params: {
+// Probe the source's real duration via the worker (ffprobe over the presigned
+// URL, header-only). Used by /api/upload/complete to gate plan duration limits
+// on the actual length before billing. 60s leaves headroom over the worker's
+// 45s ffprobe cap for the round trip + cold-start readiness.
+const PROBE_DURATION_TIMEOUT_MS = 60 * 1000;
+
+export async function probeDuration(params: {
   videoUrl: string;
   videoId: string;
   userId: string;
-}): Promise<ExtractAudioResult> {
+}): Promise<{ durationSeconds: number }> {
   const workerUrl = process.env.CLIP_WORKER_URL;
   const workerSecret = process.env.CLIP_WORKER_SECRET;
 
@@ -297,12 +294,12 @@ export async function callExtractAudio(params: {
   if (!workerSecret) throw new Error("CLIP_WORKER_SECRET is not set");
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), EXTRACT_AUDIO_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), PROBE_DURATION_TIMEOUT_MS);
 
   let statusCode: number;
   let body: Awaited<ReturnType<typeof request>>["body"];
   try {
-    ({ statusCode, body } = await request(`${workerUrl}/extract-audio`, {
+    ({ statusCode, body } = await request(`${workerUrl}/probe-duration`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -315,7 +312,7 @@ export async function callExtractAudio(params: {
   } catch (err) {
     if (isAbortError(err)) {
       throw new Error(
-        `clip-worker /extract-audio timed out after ${EXTRACT_AUDIO_TIMEOUT_MS / 1000}s for video ${params.videoId}`
+        `clip-worker /probe-duration timed out after ${PROBE_DURATION_TIMEOUT_MS / 1000}s for video ${params.videoId}`
       );
     }
     throw err;
@@ -324,6 +321,57 @@ export async function callExtractAudio(params: {
   }
 
   if (statusCode < 200 || statusCode >= 300) {
+    await body.dump().catch(() => {});
+    throw new Error(
+      `clip-worker /probe-duration returned ${statusCode} for video ${params.videoId}`
+    );
+  }
+
+  return (await body.json()) as { durationSeconds: number };
+}
+
+// Kick off the async audio-extraction job. Expects 202 (the container runs
+// extractAudio in the background and writes _audio_status.json). Mirror of
+// startClipWorker — caller polls getAudioStatus() until the marker is terminal.
+export async function startExtractAudio(params: {
+  videoUrl: string;
+  videoId: string;
+  userId: string;
+}): Promise<StartClipWorkerResult> {
+  const workerUrl = process.env.CLIP_WORKER_URL;
+  const workerSecret = process.env.CLIP_WORKER_SECRET;
+
+  if (!workerUrl) throw new Error("CLIP_WORKER_URL is not set");
+  if (!workerSecret) throw new Error("CLIP_WORKER_SECRET is not set");
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), START_PROCESS_TIMEOUT_MS);
+
+  let statusCode: number;
+  let body: Awaited<ReturnType<typeof request>>["body"];
+  try {
+    ({ statusCode, body } = await request(`${workerUrl}/extract-audio-async`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${workerSecret}`,
+      },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+      dispatcher: clipWorkerAgent,
+    }));
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new Error(
+        `clip-worker /extract-audio-async start timed out after ${START_PROCESS_TIMEOUT_MS / 1000}s for video ${params.videoId}`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (statusCode !== 202) {
     let detail = "";
     try {
       const errBody = (await body.json()) as { error?: string };
@@ -332,24 +380,57 @@ export async function callExtractAudio(params: {
       // ignore parse errors — don't leak response body
     }
     throw new Error(
-      `clip-worker /extract-audio returned ${statusCode} for video ${params.videoId}${detail}`
+      `clip-worker /extract-audio-async returned ${statusCode} (expected 202) for video ${params.videoId}${detail}`
     );
   }
 
-  const result = (await body.json()) as ExtractAudioResult;
+  return (await body.json()) as StartClipWorkerResult;
+}
 
-  // Log timings on the Next/Inngest side — container stdout doesn't reliably
-  // surface in `wrangler tail`, so this is the dependable place to read them.
-  // Gated behind DEBUG_PHASE_MARKERS (same flag as the worker breadcrumbs) — off
-  // by default, flip to "true" to re-enable timing telemetry without a rebuild.
-  if (result.timings && process.env.DEBUG_PHASE_MARKERS === "true") {
-    const t = result.timings;
-    console.log(
-      `[extract-audio][${params.videoId}] timings: TOTAL=${t.totalMs}ms ` +
-        `download=${t.downloadMs}ms ffmpeg=${t.ffmpegMs}ms upload=${t.uploadMs}ms ` +
-        `source=${(t.sourceBytes / 1024 / 1024).toFixed(1)}MB`
+// Poll the async audio job's marker via GET /status?phase=audio. Each call resets
+// the container's sleepAfter (keep-alive). Mirror of getClipWorkerStatus.
+export async function getAudioStatus(
+  videoId: string,
+  userId: string
+): Promise<AudioStatusMarker> {
+  const workerUrl = process.env.CLIP_WORKER_URL;
+  const workerSecret = process.env.CLIP_WORKER_SECRET;
+
+  if (!workerUrl) throw new Error("CLIP_WORKER_URL is not set");
+  if (!workerSecret) throw new Error("CLIP_WORKER_SECRET is not set");
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), STATUS_TIMEOUT_MS);
+
+  const qs = new URLSearchParams({ videoId, userId, phase: "audio" }).toString();
+
+  let statusCode: number;
+  let body: Awaited<ReturnType<typeof request>>["body"];
+  try {
+    ({ statusCode, body } = await request(`${workerUrl}/status?${qs}`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${workerSecret}` },
+      signal: controller.signal,
+      dispatcher: clipWorkerAgent,
+    }));
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new Error(
+        `clip-worker /status?phase=audio timed out after ${STATUS_TIMEOUT_MS / 1000}s for video ${videoId}`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (statusCode < 200 || statusCode >= 300) {
+    // Consume the body so undici returns the socket to the pool (non-2xx leak).
+    await body.dump().catch(() => {});
+    throw new Error(
+      `clip-worker /status?phase=audio returned ${statusCode} for video ${videoId}`
     );
   }
 
-  return result;
+  return (await body.json()) as AudioStatusMarker;
 }

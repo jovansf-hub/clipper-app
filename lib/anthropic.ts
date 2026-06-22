@@ -19,6 +19,54 @@ export interface ViralAnalysisResult {
   content_summary: string;
 }
 
+/**
+ * Claude Haiku Vision: locate the horizontal center of the main subject in a
+ * keyframe. Returns a fraction of frame width in [0, 1]. Never throws — any
+ * failure (API error, bad/empty JSON, out-of-range value) yields 0.5 (center)
+ * so the caller degrades to a center crop.
+ */
+export async function detectSubjectCenterX(jpegBase64: string): Promise<number> {
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 100,
+      system:
+        'You are a video crop assistant. Given a video frame, identify the horizontal center of the main speaker or subject. Return ONLY a JSON object: {"subjectCenterX": <0.0-1.0 as fraction of frame width>}. If no clear subject, return {"subjectCenterX": 0.5}.',
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: "image/jpeg", data: jpegBase64 },
+            },
+            { type: "text", text: "Where is the main subject?" },
+          ],
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") return 0.5;
+
+    let raw = textBlock.text.trim();
+    if (raw.startsWith("```json")) raw = raw.slice(7);
+    if (raw.startsWith("```")) raw = raw.slice(3);
+    if (raw.endsWith("```")) raw = raw.slice(0, -3);
+    raw = raw.trim();
+
+    const parsed = JSON.parse(raw) as { subjectCenterX?: unknown };
+    const v = parsed.subjectCenterX;
+    if (typeof v !== "number" || !isFinite(v)) return 0.5;
+    return Math.max(0, Math.min(1, v));
+  } catch (err) {
+    console.error(
+      `[detectSubjectCenterX] ${err instanceof Error ? err.message : "unknown"} — defaulting to center`
+    );
+    return 0.5;
+  }
+}
+
 export async function analyzeViralMoments(
   transcript: {
     text: string;

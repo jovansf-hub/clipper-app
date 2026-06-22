@@ -16,34 +16,36 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// A live Inngest job may still be writing to these videos — deletion is refused
-// server-side too (DELETE route returns 409). Hide the button to match.
-const IN_FLIGHT = new Set(["transcribing", "analyzing", "clipping"]);
-
 interface DeleteVideoButtonProps {
   videoId: string;
-  status: string;
+  /**
+   * Accepted for call-site compatibility but no longer gates visibility — the
+   * server is the source of truth. In-flight videos younger than the 15-min
+   * stuck threshold return 409, which we surface as a toast (see handleDelete).
+   */
+  status?: string;
   /** When set, render a labelled button (detail page). Otherwise icon-only (cards). */
   label?: string;
   /** Where to go after delete. Omit to stay and refresh (list); set to "/videos" on the detail page (the row is gone → would 404 on refresh). */
   redirectTo?: string;
+  /** Called after a successful delete. When provided (grid), the parent removes
+   *  the row in place — no router.refresh() round-trip (avoids the empty-state flash). */
+  onDeleted?: () => void;
   className?: string;
 }
 
 export function DeleteVideoButton({
   videoId,
-  status,
   label,
   redirectTo,
+  onDeleted,
   className,
 }: DeleteVideoButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Don't offer delete while a job could still be writing to the video.
-  if (IN_FLIGHT.has(status)) return null;
-
+  // Always rendered. The DELETE route decides eligibility (stuck/15-min rule).
   // Video cards wrap the whole card in a <Link>; stop the click from navigating.
   function openDialog(e: MouseEvent) {
     e.preventDefault();
@@ -55,11 +57,27 @@ export function DeleteVideoButton({
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
+      // 409 = a live job could still be writing (younger than the stuck
+      // threshold). Don't treat as an error — tell the user to wait.
+      if (res.status === 409) {
+        toast.error("Cannot delete while processing");
+        setOpen(false);
+        return;
+      }
       if (!res.ok) throw new Error("delete failed");
       toast.success("Video deleted");
       setOpen(false);
-      if (redirectTo) {
+      if (onDeleted) {
+        // Grid: remove the row in place — no server round-trip, no flash.
+        onDeleted();
+      } else if (redirectTo) {
+        // Detail page: the current row is gone. A client fetch() DELETE does NOT
+        // invalidate the App Router Cache, so push() alone can resolve against a
+        // stale cached tree and leave us on the deleted detail. push() switches
+        // the active route to /videos first; refresh() then revalidates THAT
+        // route's data (the list) — never the deleted detail, so it can't 404.
         router.push(redirectTo);
+        router.refresh();
       } else {
         router.refresh();
       }

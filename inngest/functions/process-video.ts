@@ -5,9 +5,11 @@ import { analyzeViralMoments, detectSubjectCenterX, type ViralMoment } from "@/l
 import {
   startClipWorker,
   getClipWorkerStatus,
-  callExtractAudio,
+  startExtractAudio,
+  getAudioStatus,
   callDetectKeyframes,
   type StatusMarker,
+  type AudioStatusMarker,
 } from "@/lib/clip-worker";
 import { getPresignedR2Url } from "@/lib/r2";
 import { calculateCreditCorrection } from "@/lib/credit-verification";
@@ -130,26 +132,78 @@ export const processVideo = inngest.createFunction(
     // Groq's free tier caps uploads at 25MB; a raw video easily exceeds that,
     // so we downsample to 16kHz mono Opus @ 32kbps (~7MB for 30 min) first.
     // Stays under status 'transcribing' — no new status/UI stage.
-    const audioExtraction = await step.run("extract-audio", async () => {
+    // ── ASYNC audio extraction: kick off → durable poll → size gate ──────────
+    // /extract-audio-async returns 202 and runs extractAudio in the background,
+    // so a large/slow source isn't bounded by a live HTTP connection. Mirrors the
+    // /process async flow. Result (audioKey, audioSizeBytes) lands in the audio
+    // marker, read via getAudioStatus.
+    const audioStart = await step.run("start-extract-audio", async () => {
       const supabase = createAdminClient();
 
       const { data: video, error: videoErr } = await supabase
         .from("videos")
-        .select("file_path")
+        .select("file_path, duration_seconds")
         .eq("id", videoId)
         .single();
       if (videoErr || !video) throw new Error(`Video not found: ${videoId}`);
 
       // Source video lives in R2 (file_path is the R2 key).
       const sourceUrl = await getPresignedR2Url(video.file_path, 3600);
+      const start = await startExtractAudio({ videoUrl: sourceUrl, videoId, userId });
+      if (!start.accepted) {
+        throw new Error(`clip-worker did not accept /extract-audio-async for ${videoId}`);
+      }
+      return { durationSeconds: video.duration_seconds ?? 0 };
+    });
 
-      const result = await callExtractAudio({ videoUrl: sourceUrl, videoId, userId });
+    // Poll budget scales with the (reported) duration: floor 20 min for small
+    // files, up to 60 min for very long ones. Unknown/0 duration -> floor. The
+    // duration is the upload-reported value (verify-duration corrects it later),
+    // which is fine as a budget estimate. step.sleep is durable (free wait).
+    const maxAudioPolls = Math.min(
+      360,
+      Math.max(120, 90 + Math.ceil(audioStart.durationSeconds / 60))
+    );
 
+    let audioMarker: AudioStatusMarker | null = null;
+    for (let i = 0; i < maxAudioPolls; i++) {
+      const status = await step.run(`audio-poll-${i}`, async (): Promise<AudioStatusMarker> => {
+        try {
+          return await getAudioStatus(videoId, userId);
+        } catch (err) {
+          // Transient (network/timeout/abort/5xx) — NOT the deterministic worker
+          // failure (which arrives as a returned status:"failed"). Keep waiting.
+          console.warn(
+            `[${videoId}] audio poll ${i} transient error, retrying next tick: ` +
+              (err instanceof Error ? err.message : String(err))
+          );
+          return { status: "processing" };
+        }
+      });
+      if (status.status === "completed") {
+        audioMarker = status;
+        break;
+      }
+      if (status.status === "failed") {
+        throw new Error(status.error ?? "audio extraction reported failure");
+      }
+      await step.sleep(`audio-wait-${i}`, "10s");
+    }
+    if (!audioMarker) {
+      throw new Error(
+        `audio extraction polling timed out after ${maxAudioPolls * 10}s for ${videoId}`
+      );
+    }
+    const completedAudio = audioMarker;
+
+    // >25MB gate — same business decision + refund path as before, now reading
+    // audioSizeBytes from the marker instead of a sync response. Unchanged.
+    const audioExtraction = await step.run("check-audio-size", async () => {
+      const supabase = createAdminClient();
       const MAX_GROQ_BYTES = 25 * 1024 * 1024;
-      if (result.audioSizeBytes > MAX_GROQ_BYTES) {
+      if ((completedAudio.audioSizeBytes ?? 0) > MAX_GROQ_BYTES) {
         // Even after compression the audio exceeds Groq's cap. Deterministic
-        // business failure — atomic refund + flip (exactly-once), then RETURN
-        // (not throw) so Inngest doesn't retry and the video is deletable.
+        // business failure — atomic refund + flip (exactly-once), then RETURN.
         await supabase.rpc("refund_video_once", {
           p_video_id: videoId,
           p_error_step: "extract-audio",
@@ -157,8 +211,10 @@ export const processVideo = inngest.createFunction(
         });
         return { ok: false as const };
       }
-
-      return { ok: true as const, audioKey: result.audioKey };
+      if (!completedAudio.audioKey) {
+        throw new Error(`audio marker completed but missing audioKey for ${videoId}`);
+      }
+      return { ok: true as const, audioKey: completedAudio.audioKey };
     });
 
     if (!audioExtraction.ok) {
@@ -210,6 +266,27 @@ export const processVideo = inngest.createFunction(
         .single();
       if (videoErr || !video) throw new Error(`Video not found during verify-duration: ${videoId}`);
 
+      const realDuration = Math.ceil(transcription.duration);
+
+      // Plan duration-cap backstop: if a malformed/streaming-unfriendly header
+      // fooled the upstream /probe-duration gate, catch the over-limit video
+      // here using Groq's authoritative duration. can_user_upload checks the cap
+      // BEFORE credits, so an over-cap video returns video_too_long regardless
+      // of the (already-deducted) balance — we act only on that reason.
+      const { data: capCheck } = await supabase.rpc("can_user_upload", {
+        p_user_id: userId,
+        p_video_duration_seconds: realDuration,
+      });
+      const cap = capCheck as { allowed: boolean; reason?: string } | null;
+      if (cap && !cap.allowed && cap.reason === "video_too_long") {
+        await supabase.rpc("refund_video_once", {
+          p_video_id: videoId,
+          p_error_step: "verify-duration",
+          p_error_message: "Video exceeds plan duration limit",
+        });
+        return { verified: false, reason: "video_too_long" };
+      }
+
       const correction = calculateCreditCorrection({
         realDurationSeconds:     transcription.duration,
         reportedDurationSeconds: video.duration_seconds,
@@ -239,8 +316,6 @@ export const processVideo = inngest.createFunction(
         // Throwing would trigger Inngest retries and re-attempt credit deduction.
         return { verified: false, reason: "insufficient_credits" };
       }
-
-      const realDuration = Math.ceil(transcription.duration);
 
       // Persist real values so idempotency check passes on any subsequent retry.
       await supabase

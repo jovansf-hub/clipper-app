@@ -187,6 +187,11 @@ const FFPROBE_TIMEOUT_MS = 30_000;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 const R2_UPLOAD_TIMEOUT_MS = 120_000;
 const R2_FETCH_TIMEOUT_MS = 10_000; // small R2 metadata ops (markers, status, breadcrumbs)
+// /extract-audio-async has no live client connection, so we can be generous
+// (the poll keep-alive holds the container) — hence these longer timeouts vs the
+// extractAudio() defaults used by /process-adjacent paths.
+const AUDIO_DOWNLOAD_TIMEOUT_MS = 600_000; // 10 min — large/slow source download
+const AUDIO_FFMPEG_TIMEOUT_MS = 300_000; // 5 min — Opus downsample of a long source
 const DRAIN_GUARD_MS = 5_000; // cap on post-exit stderr/stdout drain
 const PROGRESS_INTERVAL_BYTES = 5 * 1024 * 1024; // download_progress breadcrumb cadence
 
@@ -398,6 +403,22 @@ async function getClipDuration(filePath: string): Promise<number> {
   return parseFloat(output) || 0;
 }
 
+// Cheap server-side duration probe used by the /api/upload/complete cost-abuse
+// gate. ffprobe reads the container header (moov atom) over HTTPS via range
+// requests — NO full download, NO ffmpeg transcode. The arg is a presigned R2
+// URL. Tight 45s timeout; returns 0 on any failure (the caller treats 0 as
+// "could not probe" and degrades to the verify-duration backstop).
+async function probeDurationFromUrl(url: string): Promise<number> {
+  const output = await probeStdout([
+    "ffprobe", "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    url,
+  ], 45_000);
+  const d = parseFloat(output);
+  return isFinite(d) && d > 0 ? d : 0;
+}
+
 // Probe the source's pixel dimensions once so the 9:16 crop window can be
 // computed with concrete integers (needed for face-aware offsets). Throws on
 // failure; the caller degrades to the legacy expression-based center crop.
@@ -528,10 +549,11 @@ async function writeStatusMarker(
   userId: string,
   videoId: string,
   data: Record<string, unknown>,
+  marker = "_status.json",
 ): Promise<void> {
   const r2Client = getR2Client();
   const { endpoint, bucket } = getR2Config();
-  const key = `clips/${userId}/${videoId}/_status.json`;
+  const key = `clips/${userId}/${videoId}/${marker}`;
   const url = `${endpoint}/${bucket}/${key}`;
 
   const response = await r2FetchWithTimeout(r2Client, url, {
@@ -811,7 +833,11 @@ async function processClips(
 // video around ~7MB, well under Groq's 25MB upload cap.
 // ---------------------------------------------------------------------------
 
-async function extractAudio(req: ExtractAudioRequest): Promise<ExtractAudioResponse> {
+async function extractAudio(
+  req: ExtractAudioRequest,
+  downloadTimeoutMs = DOWNLOAD_TIMEOUT_MS,
+  ffmpegTimeoutMs = 120_000,
+): Promise<ExtractAudioResponse> {
   // IDs are pre-sanitized by the handler — safe to use directly in paths.
   const tmpDir = `/tmp/${req.videoId}`;
   const inputPath = `${tmpDir}/source`;
@@ -830,7 +856,7 @@ async function extractAudio(req: ExtractAudioRequest): Promise<ExtractAudioRespo
     console.log(`[${req.videoId}] Downloading source for audio extraction...`);
     await writeEaPhase(req.userId, req.videoId, "download_start");
     const downloadStart = Date.now();
-    await downloadVideo(req.videoUrl, inputPath, DOWNLOAD_TIMEOUT_MS, async (received) => {
+    await downloadVideo(req.videoUrl, inputPath, downloadTimeoutMs, async (received) => {
       await writeEaPhase(req.userId, req.videoId, "download_progress", { received });
     });
     const downloadMs = Date.now() - downloadStart;
@@ -855,7 +881,7 @@ async function extractAudio(req: ExtractAudioRequest): Promise<ExtractAudioRespo
       "-b:a", "32k",
       "-application", "voip",
       audioPath,
-    ], 120_000);
+    ], ffmpegTimeoutMs);
     const ffmpegMs = Date.now() - ffmpegStart;
     await writeEaPhase(req.userId, req.videoId, "ffmpeg_done", { ffmpegMs });
     if (DEBUG_PHASE_MARKERS) console.log(`[${req.videoId}] [timing] ffmpeg=${ffmpegMs}ms`);
@@ -1186,10 +1212,17 @@ const server = Bun.serve({
       // Async-job status poll. Every call is an incoming request that resets
       // sleepAfter → keeps the container alive while the background job runs.
       // Auth handled upstream in worker.ts (same as the other endpoints).
+      // `phase` selects the marker: "clips" (default) → _status.json,
+      // "audio" → _audio_status.json. Absent phase keeps the existing clip poll
+      // behavior unchanged.
       const videoId = url.searchParams.get("videoId");
       const userId = url.searchParams.get("userId");
+      const phase = url.searchParams.get("phase") ?? "clips";
       if (!videoId || !userId) {
         return Response.json({ error: "videoId and userId are required" }, { status: 400 });
+      }
+      if (phase !== "clips" && phase !== "audio") {
+        return Response.json({ error: "Invalid phase" }, { status: 400 });
       }
       // Validate before composing the R2 key (same allowlist as elsewhere).
       try {
@@ -1199,8 +1232,9 @@ const server = Bun.serve({
         return Response.json({ error: "Invalid request" }, { status: 400 });
       }
 
+      const marker = phase === "audio" ? "_audio_status.json" : "_status.json";
       try {
-        const raw = await readFromR2(`clips/${userId}/${videoId}/_status.json`);
+        const raw = await readFromR2(`clips/${userId}/${videoId}/${marker}`);
         if (raw === null) {
           return Response.json({ status: "not_found" });
         }
@@ -1213,7 +1247,126 @@ const server = Bun.serve({
       }
     }
 
-    if (req.method === "POST" && url.pathname === "/extract-audio") {
+    // ASYNC audio extraction — mirrors the /process async pattern. Returns 202
+    // immediately and runs extractAudio in a fire-and-forget task so a large/slow
+    // source isn't bounded by any live HTTP connection. Progress + result live in
+    // a separate R2 marker (_audio_status.json); the caller polls GET /status?phase=audio.
+    if (req.method === "POST" && url.pathname === "/extract-audio-async") {
+      const startMs = Date.now();
+      try {
+        let body: unknown;
+        try {
+          body = await req.json();
+        } catch {
+          return Response.json({ error: "Invalid request" }, { status: 400 });
+        }
+
+        if (!validateExtractAudioRequest(body)) {
+          return Response.json({ error: "Invalid request" }, { status: 400 });
+        }
+
+        try {
+          sanitizeId(body.videoId, "videoId");
+          sanitizeId(body.userId, "userId");
+          validateVideoUrl(body.videoUrl);
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : "Validation error";
+          console.error(`[validation] videoId=${body.videoId}: ${detail}`);
+          return Response.json({ error: "Invalid request" }, { status: 400 });
+        }
+
+        // IDEMPOTENCY: an Inngest retry re-POSTs. If the audio job is already in
+        // flight or done, return 202 without starting a second extraction.
+        const markerKey = `clips/${body.userId}/${body.videoId}/_audio_status.json`;
+        const existing = await readFromR2(markerKey);
+        if (existing) {
+          try {
+            const parsed = JSON.parse(existing) as { status?: string };
+            if (parsed.status === "processing" || parsed.status === "completed") {
+              return Response.json(
+                { accepted: true, videoId: body.videoId, skipped: true },
+                { status: 202 }
+              );
+            }
+          } catch {
+            // Corrupt marker — fall through and overwrite with a fresh one.
+          }
+        }
+
+        // Mark processing BEFORE returning so an immediate poll sees "processing".
+        await writeStatusMarker(
+          body.userId,
+          body.videoId,
+          { status: "processing", startedAt: Date.now() },
+          "_audio_status.json"
+        );
+
+        const job = body;
+        // Fire-and-forget: survives the 202 (persistent container). ALWAYS writes
+        // a final marker. Generous timeouts since there is no live client to cut.
+        void (async () => {
+          try {
+            const result = await extractAudio(job, AUDIO_DOWNLOAD_TIMEOUT_MS, AUDIO_FFMPEG_TIMEOUT_MS);
+
+            // Same split as /process #5b: a completed-marker write failure must
+            // NOT be recorded as "failed" (the audio IS in R2). Retry the write;
+            // its failures are caught here and never reach the outer catch.
+            const completedMarker = {
+              status: "completed" as const,
+              audioKey: result.audioKey,
+              audioSizeBytes: result.audioSizeBytes,
+              durationSeconds: result.durationSeconds,
+              processingMs: Date.now() - startMs,
+            };
+            const MARKER_WRITE_ATTEMPTS = 3;
+            for (let attempt = 1; attempt <= MARKER_WRITE_ATTEMPTS; attempt++) {
+              try {
+                await writeStatusMarker(job.userId, job.videoId, completedMarker, "_audio_status.json");
+                console.log(
+                  `[${job.videoId}] [AUDIO DONE] audio=${(result.audioSizeBytes / 1024 / 1024).toFixed(1)}MB processingMs=${Date.now() - startMs}`
+                );
+                return;
+              } catch (markerErr) {
+                console.error(
+                  `[${job.videoId}] [AUDIO] completed-marker write failed (attempt ${attempt}/${MARKER_WRITE_ATTEMPTS}):`,
+                  markerErr instanceof Error ? markerErr.message : markerErr
+                );
+                if (attempt < MARKER_WRITE_ATTEMPTS) {
+                  await new Promise((r) => setTimeout(r, 1000 * attempt));
+                }
+              }
+            }
+            console.error(
+              `[${job.videoId}] [AUDIO] CRITICAL: extraction succeeded but completed-marker write failed after ${MARKER_WRITE_ATTEMPTS} attempts — NOT marking failed`
+            );
+          } catch (err) {
+            const error = err instanceof Error ? err.message : "Unknown error";
+            console.error(`[${job.videoId}] [AUDIO ERROR]`, error);
+            try {
+              await writeStatusMarker(
+                job.userId,
+                job.videoId,
+                { status: "failed", error },
+                "_audio_status.json"
+              );
+            } catch (markerErr) {
+              console.error(`[${job.videoId}] [AUDIO ERROR] could not write failure marker:`, markerErr);
+            }
+          }
+        })();
+
+        return Response.json({ accepted: true, videoId: body.videoId }, { status: 202 });
+      } catch (err) {
+        console.error("[AUDIO ERROR]", err);
+        const error = err instanceof Error ? err.message : "Unknown error";
+        return Response.json({ error }, { status: 500 });
+      }
+    }
+
+    // Cheap duration probe — ffprobe the presigned source URL (header-only via
+    // range requests, no download/ffmpeg). Used by /api/upload/complete to gate
+    // plan duration limits on the REAL length before any billing/pipeline cost.
+    if (req.method === "POST" && url.pathname === "/probe-duration") {
       let body: unknown;
       try {
         body = await req.json();
@@ -1221,11 +1374,10 @@ const server = Bun.serve({
         return Response.json({ error: "Invalid request" }, { status: 400 });
       }
 
+      // Same shape + hardening as /extract-audio-async (videoUrl, videoId, userId).
       if (!validateExtractAudioRequest(body)) {
         return Response.json({ error: "Invalid request" }, { status: 400 });
       }
-
-      // Same hardening as /process: sanitize ids, allowlist the source domain.
       try {
         sanitizeId(body.videoId, "videoId");
         sanitizeId(body.userId, "userId");
@@ -1236,15 +1388,15 @@ const server = Bun.serve({
         return Response.json({ error: "Invalid request" }, { status: 400 });
       }
 
-      await writeEaPhase(body.userId, body.videoId, "body_parsed");
       try {
-        const result = await extractAudio(body);
-        return Response.json(result);
+        const durationSeconds = await probeDurationFromUrl(body.videoUrl);
+        return Response.json({ durationSeconds });
       } catch (err) {
-        const error = err instanceof Error ? err.message : "Unknown error";
-        await writeEaPhase(body.userId, body.videoId, "error", { message: error });
-        console.error(`[${body.videoId}] Audio extraction failed:`, error);
-        return Response.json({ error: "Audio extraction failed" }, { status: 500 });
+        console.error(
+          `[${body.videoId}] probe-duration failed:`,
+          err instanceof Error ? err.message : err
+        );
+        return Response.json({ error: "Probe failed" }, { status: 500 });
       }
     }
 

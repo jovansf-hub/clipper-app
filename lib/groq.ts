@@ -33,10 +33,13 @@ export async function transcribeAudio(
   }
   const audioBlob = await response.blob();
 
+  // Safety net: the pipeline extracts a compressed Opus file before this call,
+  // so we should never hit the cap here. If we do, the extracted audio is
+  // unexpectedly large — surface it rather than letting Groq reject the upload.
   const sizeMB = audioBlob.size / (1024 * 1024);
   if (sizeMB > 25) {
     throw new Error(
-      `Audio too large for Groq direct (${sizeMB.toFixed(1)}MB > 25MB). Audio extraction needed - implementing in Day 7.`
+      `Audio too large for Groq (${sizeMB.toFixed(1)}MB > 25MB) after extraction.`
     );
   }
 
@@ -61,14 +64,32 @@ export async function transcribeAudio(
 
   const file = new File([audioBlob], fileName, { type: mimeType });
 
-  const transcription = await groq.audio.transcriptions.create({
-    file,
-    model: "whisper-large-v3-turbo",
-    response_format: "verbose_json",
-    timestamp_granularities: ["word", "segment"],
-    language: language && language !== "auto" ? language : undefined,
-    temperature: 0,
-  });
+  // Bound the Groq call to 60s. If it stalls, abort so the Inngest step throws
+  // and (after the single retry) onFailure refunds, rather than hanging.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+  let transcription;
+  try {
+    transcription = await groq.audio.transcriptions.create(
+      {
+        file,
+        model: "whisper-large-v3-turbo",
+        response_format: "verbose_json",
+        timestamp_granularities: ["word", "segment"],
+        language: language && language !== "auto" ? language : undefined,
+        temperature: 0,
+      },
+      { signal: controller.signal }
+    );
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Groq transcription timed out after 60s");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   return {
     text: transcription.text,

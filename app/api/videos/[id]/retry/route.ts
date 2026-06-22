@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { checkInFlightCap } from "@/lib/rate-limit";
 
 type Params = Promise<{ id: string }>;
 
@@ -23,6 +24,17 @@ export async function POST(
   }
 
   const admin = createAdminClient();
+
+  // #3 rate limit: block re-queueing if the user is already at their in-flight
+  // concurrency cap. The failed video isn't in an in-flight status, so it isn't
+  // self-counted.
+  const rate = await checkInFlightCap(admin, user.id);
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: rate.error },
+      { status: rate.status, headers: { "Retry-After": String(rate.retryAfter) } }
+    );
+  }
 
   // Verify ownership and that video is actually in 'failed' state.
   // Prevents resetting videos that are still processing or already completed.
