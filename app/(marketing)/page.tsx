@@ -1,29 +1,12 @@
-import { Header } from "@/components/marketing/header";
-import { Hero } from "@/components/marketing/hero";
-import { SocialProof } from "@/components/marketing/social-proof";
-import { Features } from "@/components/marketing/features";
-import { HowItWorks } from "@/components/marketing/how-it-works";
-import { PricingSection } from "@/components/marketing/pricing-section";
-import { Comparison } from "@/components/marketing/comparison";
-import { FAQ } from "@/components/marketing/faq";
-import { FinalCTA } from "@/components/marketing/final-cta";
-import { Footer } from "@/components/marketing/footer";
+import type { Metadata } from "next";
+import { ClipperLanding } from "@/components/marketing/clipper-landing";
+
+export const metadata: Metadata = {
+  title: "Gyrom — find the clips hiding in your long videos",
+  description:
+    "Drop in a podcast, interview, or stream. Gyrom finds the moments worth posting, adds captions, and reframes them vertical for TikTok, Reels, and Shorts.",
+};
 
 export default function LandingPage() {
-  return (
-    <>
-      <Header />
-      <main>
-        <Hero />
-        <SocialProof />
-        <Features />
-        <HowItWorks />
-        <PricingSection />
-        <Comparison />
-        <FAQ />
-        <FinalCTA />
-      </main>
-      <Footer />
-    </>
-  );
+  return <ClipperLanding />;
 }
