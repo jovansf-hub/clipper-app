@@ -48,73 +48,77 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Gyrom palette — light. Coral + indigo stay as brand accents (not grayscale).
+   Hex sources match the landing .clp scope to avoid drift:
+   ink #0A0C0F · bone #F3EFE7 · coral #D85A30 · indigo #6E8BFF · line #23272F */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: oklch(0.9850 0.0041 91.45); /* #FBFAF7 warm off-white */
+  --foreground: oklch(0.1727 0.0089 264.31); /* ink */
+  --card: oklch(1 0 0); /* white */
+  --card-foreground: oklch(0.1727 0.0089 264.31);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.1727 0.0089 264.31);
+  --primary: oklch(0.6227 0.1683 38.26); /* coral */
+  --primary-foreground: oklch(0.1727 0.0089 264.31); /* ink */
+  --secondary: oklch(0.9300 0.0060 88); /* light warm gray surface */
+  --secondary-foreground: oklch(0.1727 0.0089 264.31);
+  --muted: oklch(0.9300 0.0060 88);
+  --muted-foreground: oklch(0.5510 0.0234 264.36); /* #6B7280 */
+  --accent: oklch(0.6703 0.1739 270.56); /* indigo */
+  --accent-foreground: oklch(0.1727 0.0089 264.31); /* ink */
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --border: oklch(0.9076 0.0116 84.58); /* #E4E0D8 */
+  --input: oklch(0.9076 0.0116 84.58);
+  --ring: oklch(0.6703 0.1739 270.56); /* indigo */
+  --chart-1: oklch(0.6227 0.1683 38.26); /* coral */
+  --chart-2: oklch(0.6703 0.1739 270.56); /* indigo */
+  --chart-3: oklch(0.7545 0.1601 48.08); /* coral-2 */
+  --chart-4: oklch(0.6662 0.0218 267.20);
+  --chart-5: oklch(0.4929 0.0217 268.86);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.1727 0.0089 264.31);
+  --sidebar-primary: oklch(0.6227 0.1683 38.26);
+  --sidebar-primary-foreground: oklch(0.1727 0.0089 264.31);
+  --sidebar-accent: oklch(0.9300 0.0060 88);
+  --sidebar-accent-foreground: oklch(0.1727 0.0089 264.31);
+  --sidebar-border: oklch(0.9076 0.0116 84.58);
+  --sidebar-ring: oklch(0.6703 0.1739 270.56);
 }
 
+/* Gyrom palette — dark (default theme). Matches the landing .clp scope. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.1535 0.0072 258.40); /* ink #0A0C0F */
+  --foreground: oklch(0.9530 0.0115 84.58); /* bone #F3EFE7 */
+  --card: oklch(0.1993 0.0111 260.66); /* panel #13161B */
+  --card-foreground: oklch(0.9530 0.0115 84.58);
+  --popover: oklch(0.1993 0.0111 260.66);
+  --popover-foreground: oklch(0.9530 0.0115 84.58);
+  --primary: oklch(0.6227 0.1683 38.26); /* coral #D85A30 */
+  --primary-foreground: oklch(0.1535 0.0072 258.40); /* ink */
+  --secondary: oklch(0.2383 0.0147 261.65); /* panel-2 #1B1F26 */
+  --secondary-foreground: oklch(0.9530 0.0115 84.58);
+  --muted: oklch(0.2383 0.0147 261.65);
+  --muted-foreground: oklch(0.6662 0.0218 267.20); /* #8E94A2 */
+  --accent: oklch(0.6703 0.1739 270.56); /* indigo #6E8BFF */
+  --accent-foreground: oklch(0.1535 0.0072 258.40); /* ink */
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: oklch(0.2722 0.0160 264.26); /* line #23272F */
+  --input: oklch(0.2722 0.0160 264.26);
+  --ring: oklch(0.6703 0.1739 270.56); /* indigo */
+  --chart-1: oklch(0.6227 0.1683 38.26);
+  --chart-2: oklch(0.6703 0.1739 270.56);
+  --chart-3: oklch(0.7545 0.1601 48.08);
+  --chart-4: oklch(0.6662 0.0218 267.20);
+  --chart-5: oklch(0.4929 0.0217 268.86);
+  --sidebar: oklch(0.1993 0.0111 260.66);
+  --sidebar-foreground: oklch(0.9530 0.0115 84.58);
+  --sidebar-primary: oklch(0.6227 0.1683 38.26);
+  --sidebar-primary-foreground: oklch(0.1535 0.0072 258.40);
+  --sidebar-accent: oklch(0.2383 0.0147 261.65);
+  --sidebar-accent-foreground: oklch(0.9530 0.0115 84.58);
+  --sidebar-border: oklch(0.2722 0.0160 264.26);
+  --sidebar-ring: oklch(0.6703 0.1739 270.56);
 }
 
 @layer base {

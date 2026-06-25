@@ -7,15 +7,15 @@
  */
 
 .clp {
-  --ink: #0e1014;
-  --panel: #16191f;
-  --panel-2: #1e222b;
-  --line: #2a2f3a;
+  --ink: #0a0c0f;
+  --panel: #13161b;
+  --panel-2: #1b1f26;
+  --line: #23272f;
   --bone: #f3efe7;
   --muted: #8e94a2;
   --muted-dim: #5c616e;
-  --coral: #ff6a3d;
-  --coral-2: #ff8c4b;
+  --coral: #d85a30;
+  --coral-2: #e5743f;
   --indigo: #6e8bff;
   --display: var(--font-space-grotesk), system-ui, -apple-system, sans-serif;
   --body: var(--font-inter), system-ui, -apple-system, sans-serif;
@@ -38,7 +38,7 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(900px 520px at 78% -8%, rgba(255, 106, 61, 0.12), transparent 60%),
+    radial-gradient(900px 520px at 78% -8%, rgba(216, 90, 48, 0.07), transparent 60%),
     radial-gradient(760px 500px at 8% 12%, rgba(110, 139, 255, 0.09), transparent 62%);
 }
 .clp .wrap {
@@ -109,7 +109,7 @@
   position: relative;
   background: linear-gradient(145deg, var(--coral), var(--coral-2));
   flex-shrink: 0;
-  box-shadow: 0 0 18px rgba(255, 106, 61, 0.45);
+  box-shadow: 0 0 18px rgba(216, 90, 48, 0.45);
 }
 .clp .mark::after {
   content: "";
@@ -156,11 +156,11 @@
 .clp .btn-primary {
   background: var(--coral);
   color: #1a0c06;
-  box-shadow: 0 6px 22px rgba(255, 106, 61, 0.3);
+  box-shadow: 0 6px 22px rgba(216, 90, 48, 0.18);
 }
 .clp .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(255, 106, 61, 0.42);
+  box-shadow: 0 10px 30px rgba(216, 90, 48, 0.25);
   background: var(--coral-2);
 }
 .clp .btn-ghost {
@@ -280,7 +280,7 @@
   position: relative;
   background: var(--coral) !important;
   opacity: 1 !important;
-  box-shadow: 0 0 14px rgba(255, 106, 61, 0.7);
+  box-shadow: 0 0 14px rgba(216, 90, 48, 0.7);
   animation: clp-pulse 2.6s ease-in-out infinite;
 }
 .clp .moment.b {
@@ -292,10 +292,10 @@
 @keyframes clp-pulse {
   0%,
   100% {
-    box-shadow: 0 0 8px rgba(255, 106, 61, 0.45);
+    box-shadow: 0 0 8px rgba(216, 90, 48, 0.45);
   }
   50% {
-    box-shadow: 0 0 18px rgba(255, 106, 61, 0.95);
+    box-shadow: 0 0 18px rgba(216, 90, 48, 0.95);
   }
 }
 .clp .scan {
@@ -348,7 +348,7 @@
 }
 .clp .clip:hover {
   transform: translateY(-5px);
-  border-color: rgba(255, 106, 61, 0.5);
+  border-color: rgba(216, 90, 48, 0.5);
 }
 .clp .clip:nth-child(1) {
   background: linear-gradient(150deg, #2a2330, #191a22);
@@ -524,8 +524,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 106, 61, 0.1);
-  border: 1px solid rgba(255, 106, 61, 0.22);
+  background: rgba(216, 90, 48, 0.1);
+  border: 1px solid rgba(216, 90, 48, 0.22);
 }
 .clp .feat .fic svg {
   width: 21px;

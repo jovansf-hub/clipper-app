@@ -1,21 +1,25 @@
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthHeader } from "@/components/auth/auth-header";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 
 export default function LoginPage() {
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your account to continue</CardDescription>
+    <Card className="border border-border shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+      <CardHeader>
+        <AuthHeader
+          eyebrow="// SIGN IN"
+          title="Welcome back"
+          description="Sign in to your account to continue"
+        />
       </CardHeader>
       <CardContent>
         <LoginForm />
       </CardContent>
-      <CardFooter className="flex flex-col gap-2 text-sm text-center text-slate-600 dark:text-slate-400">
+      <CardFooter className="flex flex-col gap-2 text-sm text-center text-muted-foreground">
         <div>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-slate-900 dark:text-slate-100 font-medium hover:underline">
+          <Link href="/signup" className="text-foreground font-medium hover:underline">
             Sign up
           </Link>
         </div>

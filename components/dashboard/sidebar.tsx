@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Scissors,
   LayoutDashboard,
   Upload,
   Video,
@@ -15,6 +14,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "./user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { BrandMark } from "@/components/brand-mark";
 
 type Profile = {
   email: string;
@@ -48,8 +49,8 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               isActive
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             <Icon className="size-4 shrink-0" />
@@ -68,8 +69,11 @@ function SidebarContent({ profile, userEmail, onNavigate }: SidebarProps & { onN
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-5">
-        <Scissors className="size-5 text-slate-900 dark:text-slate-100" />
-        <span className="text-lg font-bold text-slate-900 dark:text-slate-100">Clipper</span>
+        <BrandMark />
+        <span className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold text-foreground">Gyrom</span>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Nav */}
@@ -78,7 +82,7 @@ function SidebarContent({ profile, userEmail, onNavigate }: SidebarProps & { onN
       </div>
 
       {/* User menu */}
-      <div className="border-t border-slate-200 dark:border-slate-800 p-3">
+      <div className="border-t border-border p-3">
         <UserMenu
           email={profile?.email ?? userEmail}
           plan={profile?.plan ?? "free"}
@@ -94,13 +98,13 @@ export function Sidebar({ profile, userEmail }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 z-30">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-border bg-card z-30">
         <SidebarContent profile={profile} userEmail={userEmail} />
       </aside>
 
       {/* Mobile: hamburger button */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 flex size-9 items-center justify-center rounded-lg bg-white border border-slate-200 shadow-sm dark:bg-slate-950 dark:border-slate-800"
+        className="md:hidden fixed top-4 left-4 z-50 flex size-9 items-center justify-center rounded-lg bg-card border border-border shadow-sm"
         onClick={() => setMobileOpen(true)}
         aria-label="Open menu"
       >
@@ -118,12 +122,12 @@ export function Sidebar({ profile, userEmail }: SidebarProps) {
       {/* Mobile: drawer */}
       <aside
         className={cn(
-          "md:hidden fixed inset-y-0 left-0 z-50 w-64 flex flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 transition-transform duration-200",
+          "md:hidden fixed inset-y-0 left-0 z-50 w-64 flex flex-col border-r border-border bg-card transition-transform duration-200",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <button
-          className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-lg hover:bg-muted"
           onClick={() => setMobileOpen(false)}
           aria-label="Close menu"
         >

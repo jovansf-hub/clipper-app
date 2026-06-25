@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthHeader } from "@/components/auth/auth-header";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 
 export default function ForgotPasswordPage() {
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl">Reset your password</CardTitle>
-        <CardDescription>Enter your email and we&apos;ll send you a reset link</CardDescription>
+    <Card className="border border-border shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+      <CardHeader>
+        <AuthHeader
+          eyebrow="// RESET"
+          title="Reset your password"
+          description="Enter your email and we'll send you a reset link"
+        />
       </CardHeader>
       <CardContent>
         <ForgotPasswordForm />
       </CardContent>
-      <CardFooter className="text-sm text-center text-slate-600 dark:text-slate-400">
+      <CardFooter className="text-sm text-center text-muted-foreground">
         <Link href="/login" className="hover:underline">
           Back to sign in
         </Link>
