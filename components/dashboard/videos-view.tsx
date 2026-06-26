@@ -3,10 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Film, Upload } from "lucide-react";
+import { Film, Upload, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DeleteVideoButton } from "@/components/dashboard/delete-video-button";
 import { formatDuration } from "@/lib/utils";
 
@@ -46,9 +56,40 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
   // Client-owned list so a delete removes the card in place — no router.refresh()
   // round-trip (which briefly flashed the empty/upload state during the reload).
   const [videos, setVideos] = useState(initialVideos);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const removeVideo = (id: string) =>
     setVideos((prev) => prev.filter((v) => v.id !== id));
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true);
+    try {
+      const res = await fetch("/api/videos/bulk-delete", { method: "POST" });
+      if (!res.ok) throw new Error("bulk delete failed");
+      const { deleted, skipped, failed, deletedIds } = (await res.json()) as {
+        deleted: number;
+        skipped: number;
+        failed: number;
+        deletedIds: string[];
+      };
+      // Remove only the rows actually deleted; in-flight (skipped) stay visible.
+      const ids = new Set(deletedIds);
+      setVideos((prev) => prev.filter((v) => !ids.has(v.id)));
+      setBulkOpen(false);
+
+      const parts = [`${deleted} deleted`];
+      if (skipped) parts.push(`${skipped} still processing — skipped`);
+      if (failed) parts.push(`${failed} failed`);
+      const summary = parts.join(", ");
+      if (failed) toast.error(summary);
+      else toast.success(summary);
+    } catch {
+      toast.error("Could not delete, please retry");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -62,11 +103,57 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
             {videos.length} video{videos.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button render={<Link href="/upload" />} nativeButton={false}>
-          <Upload className="size-4" />
-          Upload Video
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setBulkOpen(true)}
+            disabled={videos.length === 0 || bulkDeleting}
+          >
+            <Trash2 className="size-4" />
+            Delete all
+          </Button>
+          <Button render={<Link href="/upload" />} nativeButton={false}>
+            <Upload className="size-4" />
+            Upload Video
+          </Button>
+        </div>
       </div>
+
+      {/* Bulk delete confirm */}
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Delete all videos?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all {videos.length} video
+              {videos.length !== 1 ? "s" : ""} and their clips. This cannot be
+              undone. Videos still processing are skipped.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline" disabled={bulkDeleting} />}
+            >
+              Cancel
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+            >
+              {bulkDeleting ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete all"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Empty state — rendered inline so it appears instantly after the last
           row is removed, without navigating to /upload. */}
