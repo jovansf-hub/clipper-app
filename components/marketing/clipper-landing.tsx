@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import "./clipper-landing.css";
@@ -11,15 +11,16 @@ const h = (value: string): CSSProperties => ({ ["--h"]: value } as CSSProperties
 export function ClipperLanding() {
   const navRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
     const nav = navRef.current;
     const root = rootRef.current;
 
-    // Nav border-on-scroll.
+    // Nav border-on-scroll + back-to-top visibility.
     const onScroll = () => {
-      if (!nav) return;
-      nav.classList.toggle("scrolled", window.scrollY > 10);
+      if (nav) nav.classList.toggle("scrolled", window.scrollY > 10);
+      setShowTop(window.scrollY > 600);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -51,6 +52,11 @@ export function ClipperLanding() {
       io?.disconnect();
     };
   }, []);
+
+  const scrollToTop = () => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  };
 
   return (
     <div className="clp" ref={rootRef}>
@@ -619,6 +625,19 @@ export function ClipperLanding() {
           <span className="mono">© 2026 Gyrom</span>
         </div>
       </footer>
+
+      <button
+        type="button"
+        onClick={scrollToTop}
+        className={`to-top${showTop ? " show" : ""}`}
+        aria-label="Back to top"
+        aria-hidden={!showTop}
+        tabIndex={showTop ? 0 : -1}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+      </button>
     </div>
   );
 }

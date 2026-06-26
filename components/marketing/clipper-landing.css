@@ -858,6 +858,53 @@
   color: var(--bone);
 }
 
+/* ---------- back to top ---------- */
+.clp .to-top {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 60;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: var(--coral);
+  color: #1a0c06;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgba(216, 90, 48, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.25s ease, visibility 0.3s,
+    box-shadow 0.25s ease, background 0.2s ease;
+}
+.clp .to-top.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.clp .to-top:hover {
+  background: var(--coral-2);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(216, 90, 48, 0.38);
+}
+.clp .to-top:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 3px;
+}
+.clp .to-top svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* ---------- reveal ---------- */
 .clp .rv {
   opacity: 0;
@@ -916,6 +963,10 @@
   .clp .price-r {
     padding: 32px 26px;
   }
+  .clp .to-top {
+    right: 18px;
+    bottom: 18px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .clp *,
@@ -928,5 +979,12 @@
     opacity: 1;
     transform: none;
     transition: none;
+  }
+  .clp .to-top {
+    transition: none;
+    transform: none;
+  }
+  .clp .to-top:hover {
+    transform: none;
   }
 }
