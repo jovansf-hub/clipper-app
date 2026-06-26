@@ -17,6 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DeleteVideoButton } from "@/components/dashboard/delete-video-button";
 import { formatDuration } from "@/lib/utils";
 
@@ -58,9 +60,18 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
   const [videos, setVideos] = useState(initialVideos);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // GitHub-style typed confirmation — submit is gated until this equals "DELETE".
+  const [confirmText, setConfirmText] = useState("");
 
   const removeVideo = (id: string) =>
     setVideos((prev) => prev.filter((v) => v.id !== id));
+
+  // Reset the typed confirmation whenever the modal opens or closes so it never
+  // carries a stale "DELETE" into the next open.
+  function handleBulkOpenChange(open: boolean) {
+    setBulkOpen(open);
+    if (!open) setConfirmText("");
+  }
 
   async function handleBulkDelete() {
     setBulkDeleting(true);
@@ -77,6 +88,7 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
       const ids = new Set(deletedIds);
       setVideos((prev) => prev.filter((v) => !ids.has(v.id)));
       setBulkOpen(false);
+      setConfirmText("");
 
       const parts = [`${deleted} deleted`];
       if (skipped) parts.push(`${skipped} still processing — skipped`);
@@ -120,17 +132,31 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
         </div>
       </div>
 
-      {/* Bulk delete confirm */}
-      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+      {/* Bulk delete confirm — GitHub-style typed confirmation */}
+      <Dialog open={bulkOpen} onOpenChange={handleBulkOpenChange}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Delete all videos?</DialogTitle>
             <DialogDescription>
-              This will permanently delete all {videos.length} video
-              {videos.length !== 1 ? "s" : ""} and their clips. This cannot be
-              undone. Videos still processing are skipped.
+              Type <span className="font-semibold text-foreground">DELETE</span>{" "}
+              to confirm deleting all {videos.length} video
+              {videos.length !== 1 ? "s" : ""}. This cannot be undone. Videos
+              still processing are skipped.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-confirm" className="sr-only">
+              Type DELETE to confirm
+            </Label>
+            <Input
+              id="bulk-confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="DELETE"
+              autoComplete="off"
+              disabled={bulkDeleting}
+            />
+          </div>
           <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={bulkDeleting} />}
@@ -140,7 +166,7 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
             <Button
               variant="destructive"
               onClick={handleBulkDelete}
-              disabled={bulkDeleting}
+              disabled={bulkDeleting || confirmText !== "DELETE"}
             >
               {bulkDeleting ? (
                 <>
