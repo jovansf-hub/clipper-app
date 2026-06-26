@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { ClipperLanding } from "@/components/marketing/clipper-landing";
 
 export const metadata: Metadata = {
-  title: "Gyrom — find the clips hiding in your long videos",
+  title: "Gyrom — AI Video Clipper for Podcasts, Interviews and Long Videos",
   description:
-    "Drop in a podcast, interview, or stream. Gyrom finds the moments worth posting, adds captions, and reframes them vertical for TikTok, Reels, and Shorts.",
+    "Gyrom turns long videos into short, vertical clips for TikTok, Reels and YouTube Shorts. Free during beta.",
 };
 
 export default function LandingPage() {

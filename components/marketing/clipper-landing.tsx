@@ -64,6 +64,7 @@ export function ClipperLanding() {
             <a href="#how">How it works</a>
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
           </div>
           <Link href="/signup" className="btn btn-primary">
             Start free
@@ -287,6 +288,177 @@ export function ClipperLanding() {
 
       <div className="divider" />
 
+      {/* who it's for */}
+      <section id="who" className="wrap rv">
+        <div className="sec-head">
+          <span className="eyebrow">Who it&apos;s for</span>
+          <h2>Made for people who record a lot.</h2>
+          <p>
+            If you make long-form content, Gyrom turns it into a steady stream of
+            short clips without the editing afternoon.
+          </p>
+        </div>
+        <div className="aud">
+          <div className="aud-card">
+            <div className="aic">
+              <svg viewBox="0 0 24 24">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0014 0M12 18v3" />
+              </svg>
+            </div>
+            <h3>Podcasters</h3>
+            <p>
+              Turn every episode into a handful of shareable moments — without
+              re-listening to the whole thing.
+            </p>
+          </div>
+          <div className="aud-card">
+            <div className="aic">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="5" width="18" height="14" rx="3" />
+                <path d="M10 9l5 3-5 3z" />
+              </svg>
+            </div>
+            <h3>YouTubers</h3>
+            <p>
+              Spin long uploads and streams into vertical Shorts, Reels, and
+              TikToks to reach new viewers.
+            </p>
+          </div>
+          <div className="aud-card">
+            <div className="aic">
+              <svg viewBox="0 0 24 24">
+                <path d="M2 8l10-4 10 4-10 4z" />
+                <path d="M6 10v5c0 1.4 3 3 6 3s6-1.6 6-3v-5" />
+              </svg>
+            </div>
+            <h3>Coaches &amp; educators</h3>
+            <p>
+              Pull the most useful explanations out of webinars and lessons to
+              share as bite-sized teaching clips.
+            </p>
+          </div>
+          <div className="aud-card">
+            <div className="aic">
+              <svg viewBox="0 0 24 24">
+                <circle cx="9" cy="8" r="3" />
+                <path d="M3 20a6 6 0 0112 0M16 6a3 3 0 010 6M21 20a6 6 0 00-5-5.9" />
+              </svg>
+            </div>
+            <h3>Agencies</h3>
+            <p>
+              Clip client recordings faster and hand back ready-to-post verticals
+              instead of raw footage.
+            </p>
+          </div>
+          <div className="aud-card">
+            <div className="aic">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+              </svg>
+            </div>
+            <h3>Founders building in public</h3>
+            <p>
+              Take your talks, interviews, and updates and keep a feed alive
+              without a dedicated editor.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="divider" />
+
+      {/* manual vs gyrom */}
+      <section className="wrap rv">
+        <div className="sec-head">
+          <span className="eyebrow">The difference</span>
+          <h2>Manual editing vs Gyrom.</h2>
+          <p>
+            The same job, minus the scrubbing, cutting, and exporting by hand.
+          </p>
+        </div>
+        <div className="vs">
+          <div className="vs-card">
+            <div className="vs-h">
+              <span className="vs-tag">Manual</span>
+              <h3>Editing it yourself</h3>
+            </div>
+            <div className="vs-list">
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+                <span>Watch the full video back to find anything worth using</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+                <span>Note timestamps and hunt for the right moments</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+                <span>Cut each clip by hand in an editor</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+                <span>Type out and time captions yourself</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+                <span>Reframe and export vertical formats one by one</span>
+              </div>
+            </div>
+          </div>
+          <div className="vs-card gyrom">
+            <div className="vs-h">
+              <span className="vs-tag">Gyrom</span>
+              <h3>Letting it do the work</h3>
+            </div>
+            <div className="vs-list">
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span>Upload the video — long files welcome</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span>AI reads the transcript and finds the moments</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span>Clips are generated for you automatically</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span>Captions come baked into every clip</span>
+              </div>
+              <div className="vs-row">
+                <svg viewBox="0 0 24 24">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span>Vertical 9:16 clips, ready to download and post</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="divider" />
+
       {/* pricing teaser */}
       <section id="pricing" className="wrap rv">
         <div className="sec-head">
@@ -343,6 +515,86 @@ export function ClipperLanding() {
 
       <div className="divider" />
 
+      {/* faq */}
+      <section id="faq" className="wrap rv">
+        <div className="sec-head">
+          <span className="eyebrow">FAQ</span>
+          <h2>Questions, answered.</h2>
+        </div>
+        <div className="faq-list">
+          <details className="faq-item">
+            <summary>
+              What types of videos can I upload?
+              <span className="pm" aria-hidden="true" />
+            </summary>
+            <p className="faq-a">
+              Gyrom is built for long-form recordings — podcasts, interviews,
+              webinars, talks, and streams. It works best when there&apos;s
+              spoken content to transcribe, since that&apos;s what it reads to
+              find moments.
+            </p>
+          </details>
+          <details className="faq-item">
+            <summary>
+              Is Gyrom free?
+              <span className="pm" aria-hidden="true" />
+            </summary>
+            <p className="faq-a">
+              Yes — Gyrom is free while it&apos;s in beta, and there&apos;s no
+              credit card required to start. We plan to introduce simple
+              per-video pricing later, but anything you do during the beta stays
+              free.
+            </p>
+          </details>
+          <details className="faq-item">
+            <summary>
+              Does it add captions?
+              <span className="pm" aria-hidden="true" />
+            </summary>
+            <p className="faq-a">
+              Yes. Every clip comes with captions generated from the
+              transcript and burned into the video, so it reads clearly in
+              sound-off feeds.
+            </p>
+          </details>
+          <details className="faq-item">
+            <summary>
+              Which platforms are the clips for?
+              <span className="pm" aria-hidden="true" />
+            </summary>
+            <p className="faq-a">
+              Clips are reframed to vertical 9:16, which fits TikTok, Instagram
+              Reels, and YouTube Shorts. You download the file and post it
+              wherever you like.
+            </p>
+          </details>
+          <details className="faq-item">
+            <summary>
+              Can I use it for podcasts and interviews?
+              <span className="pm" aria-hidden="true" />
+            </summary>
+            <p className="faq-a">
+              That&apos;s exactly what it&apos;s made for. Conversation-heavy
+              recordings like podcasts and interviews give Gyrom plenty of
+              transcript to work from when picking moments.
+            </p>
+          </details>
+          <details className="faq-item">
+            <summary>
+              Is Gyrom still in beta?
+              <span className="pm" aria-hidden="true" />
+            </summary>
+            <p className="faq-a">
+              Yes, Gyrom is in active beta. That means it&apos;s free to use and
+              we&apos;re still improving things — your feedback genuinely shapes
+              what gets built next.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <div className="divider" />
+
       {/* final cta */}
       <section className="wrap final rv">
         <h2>Stop scrubbing through your own footage.</h2>
@@ -362,6 +614,7 @@ export function ClipperLanding() {
             <a href="#how">How it works</a>
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
           </div>
           <span className="mono">© 2026 Gyrom</span>
         </div>

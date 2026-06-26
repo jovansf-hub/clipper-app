@@ -616,6 +616,197 @@
   font-weight: 600;
 }
 
+/* ---------- audience (who it's for) ---------- */
+.clp .aud {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 48px;
+}
+.clp .aud-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 26px 24px 28px;
+  background: rgba(255, 255, 255, 0.012);
+  transition: border-color 0.25s, background 0.25s;
+}
+.clp .aud-card:hover {
+  border-color: #363c49;
+  background: rgba(255, 255, 255, 0.025);
+}
+.clp .aud-card .aic {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: rgba(216, 90, 48, 0.1);
+  border: 1px solid rgba(216, 90, 48, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.clp .aud-card .aic svg {
+  width: 19px;
+  height: 19px;
+  stroke: var(--coral);
+  fill: none;
+  stroke-width: 1.7;
+}
+.clp .aud-card h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 16px 0 8px;
+  letter-spacing: -0.01em;
+}
+.clp .aud-card p {
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+/* ---------- comparison (manual vs gyrom) ---------- */
+.clp .vs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 48px;
+}
+.clp .vs-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 30px;
+  background: rgba(255, 255, 255, 0.012);
+}
+.clp .vs-card.gyrom {
+  border-color: rgba(216, 90, 48, 0.4);
+  background: linear-gradient(180deg, rgba(216, 90, 48, 0.06), transparent);
+}
+.clp .vs-card .vs-h {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.clp .vs-card .vs-h .vs-tag {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-dim);
+}
+.clp .vs-card.gyrom .vs-h .vs-tag {
+  color: var(--coral);
+}
+.clp .vs-card .vs-h h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+.clp .vs-list {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.clp .vs-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 15px;
+  color: var(--muted);
+}
+.clp .vs-row svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke-width: 2;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.clp .vs-card .vs-row svg {
+  stroke: var(--muted-dim);
+}
+.clp .vs-card.gyrom .vs-row svg {
+  stroke: var(--coral);
+}
+.clp .vs-card.gyrom .vs-row {
+  color: var(--bone);
+}
+
+/* ---------- faq ---------- */
+.clp .faq-list {
+  margin-top: 40px;
+  max-width: 760px;
+  border-top: 1px solid var(--line);
+}
+.clp .faq-item {
+  border-bottom: 1px solid var(--line);
+}
+.clp .faq-item summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 22px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--bone);
+  transition: color 0.2s;
+}
+.clp .faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.clp .faq-item summary:hover {
+  color: var(--coral);
+}
+.clp .faq-item summary:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.clp .faq-item summary .pm {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.clp .faq-item summary .pm::before,
+.clp .faq-item summary .pm::after {
+  content: "";
+  position: absolute;
+  background: var(--coral);
+  border-radius: 1px;
+}
+.clp .faq-item summary .pm::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+.clp .faq-item summary .pm::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  transition: transform 0.25s, opacity 0.25s;
+}
+.clp .faq-item[open] summary .pm::after {
+  transform: translateX(-50%) scaleY(0);
+  opacity: 0;
+}
+.clp .faq-item .faq-a {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 0 4px 24px;
+  max-width: 64ch;
+}
+
 /* ---------- final cta ---------- */
 .clp .final {
   text-align: center;
@@ -691,6 +882,12 @@
   .clp .feats {
     grid-template-columns: 1fr;
   }
+  .clp .aud {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .clp .vs {
+    grid-template-columns: 1fr;
+  }
   .clp .price {
     grid-template-columns: 1fr;
   }
@@ -704,6 +901,9 @@
 }
 @media (max-width: 620px) {
   .clp .steps {
+    grid-template-columns: 1fr;
+  }
+  .clp .aud {
     grid-template-columns: 1fr;
   }
   .clp .clips {
