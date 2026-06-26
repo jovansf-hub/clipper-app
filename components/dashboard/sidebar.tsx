@@ -69,8 +69,15 @@ function SidebarContent({ profile, userEmail, onNavigate }: SidebarProps & { onN
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-5">
-        <BrandMark />
-        <span className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold text-foreground">Gyrom</span>
+        <Link
+          href="/"
+          onClick={onNavigate}
+          aria-label="Gyrom home"
+          className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-80 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <BrandMark />
+          <span className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold text-foreground">Gyrom</span>
+        </Link>
         <div className="ml-auto">
           <ThemeToggle />
         </div>
