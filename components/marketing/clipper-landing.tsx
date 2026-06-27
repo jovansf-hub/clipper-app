@@ -180,8 +180,8 @@ export function ClipperLanding() {
             <span className="num">STEP 01</span>
             <h3>Drop your video</h3>
             <p>
-              Upload a long recording — a podcast, webinar, or stream. Hours-long
-              and large files are welcome.
+              Upload one long recording — a podcast, interview, webinar, or
+              stream. Hours-long and large files are welcome.
             </p>
             <div className="ic">
               <svg viewBox="0 0 24 24">
@@ -192,10 +192,10 @@ export function ClipperLanding() {
           </div>
           <div className="step">
             <span className="num">STEP 02</span>
-            <h3>AI finds the moments</h3>
+            <h3>AI finds the strongest moments</h3>
             <p>
-              It reads the full transcript and pulls the segments most likely to
-              land as standalone clips.
+              Gyrom transcribes the whole recording and picks the segments most
+              likely to land as standalone clips.
             </p>
             <div className="ic">
               <svg viewBox="0 0 24 24">
@@ -208,8 +208,8 @@ export function ClipperLanding() {
             <span className="num">STEP 03</span>
             <h3>Get clips, ready to post</h3>
             <p>
-              Each moment comes captioned and reframed to vertical 9:16 —
-              download and post.
+              Each moment comes back as a vertical 9:16 clip with captions burned
+              in — ready for TikTok, Reels, and Shorts.
             </p>
             <div className="ic">
               <svg viewBox="0 0 24 24">
@@ -359,8 +359,9 @@ export function ClipperLanding() {
             </div>
             <h3>Podcasters</h3>
             <p>
-              Turn every episode into a handful of shareable moments — without
-              re-listening to the whole thing.
+              One long episode in, several post-ready clips out — each
+              captioned and vertical, without re-listening to the whole
+              recording.
             </p>
           </div>
           <div className="aud-card">
@@ -372,8 +373,8 @@ export function ClipperLanding() {
             </div>
             <h3>YouTubers</h3>
             <p>
-              Spin long uploads and streams into vertical Shorts, Reels, and
-              TikToks to reach new viewers.
+              Drop a long upload or stream and get the strongest moments back as
+              captioned 9:16 clips — ready for Shorts, Reels, and TikTok.
             </p>
           </div>
           <div className="aud-card">
@@ -385,8 +386,8 @@ export function ClipperLanding() {
             </div>
             <h3>Coaches &amp; educators</h3>
             <p>
-              Pull the most useful explanations out of webinars and lessons to
-              share as bite-sized teaching clips.
+              Upload a webinar or lesson and let the AI surface the clearest
+              explanations as short, captioned teaching clips.
             </p>
           </div>
           <div className="aud-card">
@@ -398,8 +399,8 @@ export function ClipperLanding() {
             </div>
             <h3>Agencies</h3>
             <p>
-              Clip client recordings faster and hand back ready-to-post verticals
-              instead of raw footage.
+              Run each client&apos;s long recordings through once and hand back
+              captioned vertical clips — no manual editing per account.
             </p>
           </div>
           <div className="aud-card">
@@ -410,8 +411,8 @@ export function ClipperLanding() {
             </div>
             <h3>Founders building in public</h3>
             <p>
-              Take your talks, interviews, and updates and keep a feed alive
-              without a dedicated editor.
+              Turn one talk or interview into a set of vertical clips — keep a
+              feed going without hiring an editor.
             </p>
           </div>
         </div>
