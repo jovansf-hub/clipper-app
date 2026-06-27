@@ -91,10 +91,10 @@ function ViralScoreBadge({ score }: { score: number }) {
 
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <div className="w-20 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0">
+      <div className="w-20 h-1.5 rounded-full bg-muted shrink-0">
         <div className={`h-full rounded-full ${barClass}`} style={{ width: `${score}%` }} />
       </div>
-      <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+      <span className="text-xs text-muted-foreground shrink-0">
         {score} · {label}
       </span>
     </div>
@@ -369,20 +369,20 @@ export function VideoStatus({ initialVideo, clipCount = 0 }: VideoStatusProps) {
         <>
           {moments.length > 0 ? (
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p className="text-sm font-semibold text-foreground">
                 Found {moments.length} viral moment{moments.length !== 1 ? "s" : ""}
               </p>
 
               {moments.map((moment, i) => {
                 const hookStyle = HOOK_TYPE_STYLES[moment.hook_type] ?? {
                   label: moment.hook_type,
-                  className: "bg-slate-100 text-slate-700",
+                  className: "bg-muted text-muted-foreground",
                 };
                 return (
-                  <Card key={i} className="border-slate-200 dark:border-slate-700">
+                  <Card key={i} className="border-border">
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                        <p className="text-sm font-semibold text-foreground leading-snug">
                           {moment.title}
                         </p>
                         <span
@@ -394,7 +394,7 @@ export function VideoStatus({ initialVideo, clipCount = 0 }: VideoStatusProps) {
 
                       <ViralScoreBadge score={moment.viral_score} />
 
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>
                           {formatSeconds(moment.start_time)} – {formatSeconds(moment.end_time)}
                         </span>
@@ -402,11 +402,11 @@ export function VideoStatus({ initialVideo, clipCount = 0 }: VideoStatusProps) {
                         <span>{Math.round(moment.duration)}s</span>
                       </div>
 
-                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         {moment.reasoning}
                       </p>
 
-                      <p className="text-xs text-slate-500 dark:text-slate-500 italic leading-relaxed border-l-2 border-slate-200 dark:border-slate-700 pl-2">
+                      <p className="text-xs text-muted-foreground italic leading-relaxed border-l-2 border-border pl-2">
                         &ldquo;{moment.transcript_excerpt}&rdquo;
                       </p>
                     </CardContent>
@@ -415,17 +415,17 @@ export function VideoStatus({ initialVideo, clipCount = 0 }: VideoStatusProps) {
               })}
             </div>
           ) : video.viral_analysis ? (
-            <Card className="border-slate-200 dark:border-slate-700">
+            <Card className="border-border">
               <CardContent className="p-4 space-y-1">
-                <p className="text-sm text-slate-700 dark:text-slate-300">
+                <p className="text-sm text-foreground">
                   No viral moments found.
                 </p>
                 {video.viral_analysis.reasoning && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     {video.viral_analysis.reasoning}
                   </p>
                 )}
-                <p className="text-xs text-slate-400 dark:text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Try a longer or more dynamic recording.
                 </p>
               </CardContent>
@@ -435,10 +435,10 @@ export function VideoStatus({ initialVideo, clipCount = 0 }: VideoStatusProps) {
           {video.transcript_text && (
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
                   Transcript Preview
                 </p>
-                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                   {isExpanded
                     ? video.transcript_text
                     : video.transcript_text.slice(0, 500)}
@@ -447,7 +447,7 @@ export function VideoStatus({ initialVideo, clipCount = 0 }: VideoStatusProps) {
                 {video.transcript_text.length > 500 && (
                   <button
                     onClick={() => setIsExpanded((v) => !v)}
-                    className="mt-2 text-xs text-violet-600 dark:text-violet-400 hover:underline"
+                    className="mt-2 text-xs text-primary hover:underline"
                   >
                     {isExpanded ? "Show less" : "Read full transcript"}
                   </button>

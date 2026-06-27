@@ -64,14 +64,14 @@ export default async function VideoPage({ params }: { params: Params }) {
     <div className="max-w-3xl mx-auto space-y-6">
       <Link
         href="/videos"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="size-4" />
         My Videos
       </Link>
 
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+        <h1 className="text-2xl font-bold text-foreground leading-tight">
           {video.title}
         </h1>
         <DeleteVideoButton
@@ -99,10 +99,10 @@ export default async function VideoPage({ params }: { params: Params }) {
           <CardTitle className="text-base">Details</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="size-4 shrink-0" />
             <span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
+              <span className="font-medium text-foreground">
                 Duration
               </span>
               <br />
@@ -112,10 +112,10 @@ export default async function VideoPage({ params }: { params: Params }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <File className="size-4 shrink-0" />
             <span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
+              <span className="font-medium text-foreground">
                 Size
               </span>
               <br />
@@ -125,10 +125,10 @@ export default async function VideoPage({ params }: { params: Params }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Film className="size-4 shrink-0" />
             <span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
+              <span className="font-medium text-foreground">
                 Type
               </span>
               <br />
@@ -136,10 +136,10 @@ export default async function VideoPage({ params }: { params: Params }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Layers className="size-4 shrink-0" />
             <span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
+              <span className="font-medium text-foreground">
                 Clips requested
               </span>
               <br />
@@ -147,7 +147,7 @@ export default async function VideoPage({ params }: { params: Params }) {
             </span>
           </div>
 
-          <div className="col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+          <div className="col-span-2 pt-2 border-t border-border text-muted-foreground">
             Uploaded {format(new Date(video.created_at), "PPpp")}
           </div>
         </CardContent>

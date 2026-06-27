@@ -24,10 +24,10 @@ function ViralScoreBar({ score }: { score: number }) {
     : { label: "Low",   barClass: "bg-slate-400" };
   return (
     <div className="flex items-center gap-2">
-      <div className="w-20 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0">
+      <div className="w-20 h-1.5 rounded-full bg-muted shrink-0">
         <div className={`h-full rounded-full ${barClass}`} style={{ width: `${score}%` }} />
       </div>
-      <span className="text-xs text-slate-500 dark:text-slate-400">{score} · {label}</span>
+      <span className="text-xs text-muted-foreground">{score} · {label}</span>
     </div>
   );
 }
@@ -87,12 +87,12 @@ function ClipCard({ clip }: { clip: ClipGridItem }) {
   }
 
   const hook = clip.hook_type
-    ? (HOOK_TYPE_STYLES[clip.hook_type] ?? { label: clip.hook_type, className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" })
+    ? (HOOK_TYPE_STYLES[clip.hook_type] ?? { label: clip.hook_type, className: "bg-muted text-muted-foreground" })
     : null;
 
   return (
-    <Card className="border-slate-200 dark:border-slate-700 overflow-hidden">
-      <div className="relative bg-slate-100 dark:bg-slate-800" style={{ aspectRatio: "9/16" }}>
+    <Card className="border-border overflow-hidden">
+      <div className="relative bg-muted" style={{ aspectRatio: "9/16" }}>
         {clip.thumbnailUrl ? (
           <Image
             src={clip.thumbnailUrl}
@@ -103,13 +103,13 @@ function ClipCard({ clip }: { clip: ClipGridItem }) {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Play className="size-8 text-slate-400" />
+            <Play className="size-8 text-muted-foreground" />
           </div>
         )}
       </div>
 
       <CardContent className="p-3 space-y-2">
-        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">
+        <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
           {clip.title}
         </p>
 
@@ -119,7 +119,7 @@ function ClipCard({ clip }: { clip: ClipGridItem }) {
               {hook.label}
             </span>
           )}
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-muted-foreground">
             {formatDur(clip.duration_seconds)}
           </span>
         </div>
@@ -158,7 +158,7 @@ function ClipCard({ clip }: { clip: ClipGridItem }) {
 export function ClipsGrid({ clips }: { clips: ClipGridItem[] }) {
   if (clips.length === 0) {
     return (
-      <p className="text-sm text-slate-500 dark:text-slate-400">
+      <p className="text-sm text-muted-foreground">
         No clips generated yet.
       </p>
     );

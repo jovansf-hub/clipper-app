@@ -110,7 +110,7 @@ export function DeleteVideoButton({
           aria-label="Delete video"
           onClick={openDialog}
           className={cn(
-            "bg-background/70 text-slate-500 shadow-sm backdrop-blur-sm hover:bg-background hover:text-destructive dark:bg-slate-900/70 dark:hover:bg-slate-900",
+            "bg-background/70 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-background hover:text-destructive",
             className
           )}
         >

@@ -108,10 +108,10 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">
             My Videos
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {videos.length} video{videos.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -185,11 +185,11 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
           row is removed, without navigating to /upload. */}
       {videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Film className="size-12 text-slate-300 dark:text-slate-700 mb-4" />
-          <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1">
+          <Film className="size-12 text-muted-foreground/50 mb-4" />
+          <p className="text-sm font-medium text-foreground mb-1">
             No videos yet
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             Upload your first video and let AI find the viral moments.
           </p>
           <Button render={<Link href="/upload" />} nativeButton={false}>
@@ -212,11 +212,11 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
               <Link key={video.id} href={`/videos/${video.id}`} className="group">
                 <Card className="h-full transition-shadow hover:shadow-md">
                   {/* Thumbnail placeholder */}
-                  <div className="aspect-video bg-slate-100 dark:bg-slate-800 rounded-t-xl flex items-center justify-center relative overflow-hidden">
-                    <Film className="size-10 text-slate-300 dark:text-slate-600" />
+                  <div className="aspect-video bg-muted rounded-t-xl flex items-center justify-center relative overflow-hidden">
+                    <Film className="size-10 text-muted-foreground/50" />
                     {isProcessing && (
-                      <div className="absolute inset-0 bg-slate-900/10 dark:bg-slate-900/40 flex items-center justify-center">
-                        <div className="size-2 rounded-full bg-violet-500 animate-pulse" />
+                      <div className="absolute inset-0 bg-foreground/10 flex items-center justify-center">
+                        <div className="size-2 rounded-full bg-primary animate-pulse" />
                       </div>
                     )}
                     <div className="absolute top-2 right-2 z-10">
@@ -230,7 +230,7 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
 
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                      <p className="text-sm font-medium text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
                         {video.title}
                       </p>
                       <Badge variant={variant} className="shrink-0 mt-0.5">
@@ -238,7 +238,7 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
                       </Badge>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
                         {video.duration_seconds != null
                           ? formatDuration(video.duration_seconds)
@@ -251,7 +251,7 @@ export function VideosView({ initialVideos }: { initialVideos: VideoListItem[] }
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-400 dark:text-slate-500 capitalize">
+                    <p className="text-xs text-muted-foreground capitalize">
                       {video.content_type ?? "video"}
                     </p>
                   </CardContent>

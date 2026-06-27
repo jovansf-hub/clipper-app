@@ -68,10 +68,10 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">
             Welcome back!
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {profile?.email ?? user.email}
           </p>
         </div>
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
             {videos && videos.length > 0 && (
               <Link
                 href="/videos"
-                className="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 View all
               </Link>
@@ -122,11 +122,11 @@ export default async function DashboardPage() {
         <CardContent>
           {!videos || videos.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Film className="size-12 text-slate-300 dark:text-slate-700 mb-4" />
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1">
+              <Film className="size-12 text-muted-foreground/50 mb-4" />
+              <p className="text-sm font-medium text-foreground mb-1">
                 No videos yet
               </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              <p className="text-sm text-muted-foreground mb-6">
                 Upload your first video and let AI find the viral moments.
               </p>
               <Button render={<Link href="/upload" />} nativeButton={false}>
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
               </Button>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="divide-y divide-border">
               {videos.map((video) => (
                 <div
                   key={video.id}
@@ -144,11 +144,11 @@ export default async function DashboardPage() {
                   <div className="min-w-0">
                     <Link
                       href={`/videos/${video.id}`}
-                      className="text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline truncate block"
+                      className="text-sm font-medium text-foreground hover:underline truncate block"
                     >
                       {video.title}
                     </Link>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {format(new Date(video.created_at), "MMM d, yyyy")}
                     </p>
                   </div>

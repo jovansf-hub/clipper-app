@@ -22,7 +22,7 @@ export function CreditCalculator({
   if (duration === null) {
     return (
       <Card>
-        <CardContent className="p-4 flex items-center gap-3 text-slate-500 dark:text-slate-400">
+        <CardContent className="p-4 flex items-center gap-3 text-muted-foreground">
           <Coins className="size-4 shrink-0" />
           <p className="text-sm">
             Credit cost will be calculated once duration is detected
@@ -44,37 +44,37 @@ export function CreditCalculator({
     >
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <Coins className="size-4 text-slate-500" />
-          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+          <Coins className="size-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">
             Credit cost
           </span>
         </div>
 
         <div className="space-y-1.5 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">Video duration</span>
-            <span className="text-slate-900 dark:text-slate-100">
+            <span className="text-muted-foreground">Video duration</span>
+            <span className="text-foreground">
               {formatDuration(duration)}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">This video costs</span>
-            <span className="font-semibold text-slate-900 dark:text-slate-100">
+            <span className="text-muted-foreground">This video costs</span>
+            <span className="font-semibold text-foreground">
               {creditsNeeded} credit{creditsNeeded !== 1 ? "s" : ""}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">You have</span>
-            <span className="text-slate-900 dark:text-slate-100">
+            <span className="text-muted-foreground">You have</span>
+            <span className="text-foreground">
               {creditsRemaining} credits
             </span>
           </div>
-          <div className="border-t border-slate-100 dark:border-slate-800 pt-1.5 flex items-center justify-between">
-            <span className="text-slate-500">After upload</span>
+          <div className="border-t border-border pt-1.5 flex items-center justify-between">
+            <span className="text-muted-foreground">After upload</span>
             <span
               className={`font-semibold ${
                 hasSufficient
-                  ? "text-slate-900 dark:text-slate-100"
+                  ? "text-foreground"
                   : "text-red-600 dark:text-red-400"
               }`}
             >
