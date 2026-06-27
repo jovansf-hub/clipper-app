@@ -98,6 +98,10 @@ export function SignupForm() {
           required
           disabled={loading}
         />
+        <p className="text-xs text-muted-foreground">
+          Password must be at least 8 characters and include uppercase,
+          lowercase, number and symbol.
+        </p>
         <ul className="space-y-1 pt-1">
           {passwordChecks.map((c) => (
             <li
