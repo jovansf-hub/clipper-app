@@ -312,6 +312,51 @@ export function ClipperLanding() {
                 <path d="M5 11a7 7 0 0014 0M12 18v3" />
               </svg>
             </div>
+            {/* abstract before→after mockup — same visual language as the
+                hero device (moment-glow waveform → vertical caption clips) */}
+            <div className="pod-flow" aria-hidden="true">
+              <div className="pf-col">
+                <span className="pf-lbl">// LONG EPISODE</span>
+                <div className="pf-src">
+                  <span className="pf-dur">2:14:50</span>
+                  <span className="pf-scan" />
+                  <div className="pf-wave">
+                    <i style={h("40%")} />
+                    <i style={h("65%")} />
+                    <i className="hot" style={h("92%")} />
+                    <i style={h("50%")} />
+                    <i style={h("34%")} />
+                    <i style={h("58%")} />
+                    <i style={h("44%")} />
+                    <i style={h("72%")} />
+                    <i style={h("30%")} />
+                    <i style={h("52%")} />
+                  </div>
+                </div>
+              </div>
+              <div className="pf-arrow">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 12h13M12 6l6 6-6 6" />
+                </svg>
+              </div>
+              <div className="pf-col">
+                <span className="pf-lbl">// VERTICAL CLIPS</span>
+                <div className="pf-clips">
+                  <div className="pf-clip">
+                    <span className="pf-cap">
+                      <i />
+                      <i className="hot" />
+                    </span>
+                  </div>
+                  <div className="pf-clip">
+                    <span className="pf-cap">
+                      <i />
+                      <i className="hot" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <h3>Podcasters</h3>
             <p>
               Turn every episode into a handful of shareable moments — without
